@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minecraft Maps</title>
+
+  <style>
+    body{
+      margin:0;
+      font-family:Arial, sans-serif;
+      background:#0f1117;
+      color:white;
+    }
+
+    header{
+      height:100vh;
+      display:flex;
+      flex-direction:column;
+      justify-content:center;
+      align-items:center;
+      text-align:center;
+      background:linear-gradient(rgba(0,0,0,.6),rgba(0,0,0,.6)),
+      url("https://images.unsplash.com/photo-1627856013091-fed6e4e30025?auto=format&fit=crop&w=1600&q=80");
+      background-size:cover;
+      background-position:center;
+    }
+
+    h1{
+      font-size:50px;
+      margin:0;
+    }
+
+    p{
+      color:#ccc;
+      font-size:18px;
+    }
+
+    .btn{
+      margin-top:20px;
+      padding:12px 25px;
+      background:#39d353;
+      color:white;
+      border:none;
+      border-radius:10px;
+      text-decoration:none;
+      font-weight:bold;
+    }
+
+    section{
+      padding:50px 20px;
+    }
+
+    .card{
+      max-width:400px;
+      margin:auto;
+      background:#1b1f27;
+      border-radius:15px;
+      overflow:hidden;
+    }
+
+    .card img{
+      width:100%;
+    }
+
+    .card-content{
+      padding:15px;
+    }
+
+    .download{
+      display:inline-block;
+      margin-top:10px;
+      padding:10px 15px;
+      background:#39d353;
+      color:white;
+      border-radius:8px;
+      text-decoration:none;
+    }
+  </style>
+</head>
+
+<body>
+
+<header>
+  <h1>Minecraft Maps</h1>
+  <p>Твои лучшие карты Minecraft</p>
+  <a href="#maps" class="btn">Смотреть карты</a>
+</header>
+
+<section id="maps">
+  <div class="card">
+    <img src="https://picsum.photos/600/300">
+    <div class="card-content">
+      <h2>Первая карта</h2>
+      <p>Скоро загрузка карт будет здесь</p>
+      <a class="download" href="#">Скачать</a>
+    </div>
+  </div>
+</section>
+
+</body>
+</html>

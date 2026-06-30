@@ -1,0 +1,1436 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CryptoClicker PRO</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',sans-serif; user-select:none; }
+        body {
+            background: #0b0e14;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+            background: radial-gradient(circle at 20% 30%, #1a2a3a, #0b0e14);
+        }
+        #app {
+            max-width: 420px;
+            width: 100%;
+            background: rgba(20, 26, 36, 0.9);
+            backdrop-filter: blur(6px);
+            border-radius: 28px;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.8);
+            overflow: hidden;
+            position: relative;
+            padding-bottom: 60px;
+            border: 1px solid #2a3a4a;
+            display: none;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a2a3a, #0f1a24);
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #f7b731;
+            box-shadow: 0 2px 10px rgba(247, 183, 49, 0.2);
+        }
+        .header .title {
+            font-weight: 700;
+            font-size: 16px;
+            background: linear-gradient(45deg, #f7b731, #f5a623);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(247, 183, 49, 0.3);
+        }
+        .header .balance {
+            display: flex;
+            gap: 12px;
+            font-size: 13px;
+        }
+        .header .balance span {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            background: rgba(15, 21, 30, 0.7);
+            padding: 4px 10px;
+            border-radius: 20px;
+            border: 1px solid #2a3a4a;
+        }
+        .fa-coins { color: #f7b731; }
+        .fa-gem { color: #4fc3f7; }
+        .content { padding: 16px; min-height: 280px; }
+        .tab { display: none; animation: fadeIn 0.25s ease; }
+        .tab.active { display: block; }
+        @keyframes fadeIn { from { opacity:0; transform: translateY(8px); } to { opacity:1; transform: translateY(0); } }
+        .click-area {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .big-balance {
+            display: flex;
+            gap: 24px;
+            font-size: 22px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            background: rgba(15, 21, 30, 0.6);
+            padding: 6px 20px;
+            border-radius: 40px;
+            border: 1px solid #2a3a4a;
+            backdrop-filter: blur(4px);
+        }
+        .big-balance .coins { color: #f7b731; }
+        .big-balance .diamonds { color: #4fc3f7; }
+        .diamond-timer {
+            font-size: 13px;
+            color: #4fc3f7;
+            margin-bottom: 8px;
+            background: rgba(15, 21, 30, 0.6);
+            padding: 4px 14px;
+            border-radius: 30px;
+            border: 1px solid #2a3a4a;
+        }
+        .click-coin {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #f7d875, #e6a020);
+            box-shadow: 0 0 0 8px rgba(247, 183, 49, 0.2), 0 10px 30px rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 56px;
+            color: #fff;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: transform 0.1s, box-shadow 0.1s;
+            margin-bottom: 12px;
+            position: relative;
+        }
+        .click-coin:active { transform: scale(0.92); box-shadow: 0 0 0 14px rgba(247, 183, 49, 0.3), 0 5px 25px rgba(0,0,0,0.8); }
+        .click-coin .fa-bolt {
+            font-size: 28px;
+            opacity: 0.2;
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            color: #f7b731;
+        }
+        .energy-bar {
+            width: 100%;
+            background: #1e2633;
+            height: 10px;
+            border-radius: 20px;
+            margin: 6px 0 10px;
+            overflow: hidden;
+            border: 1px solid #2a3a4a;
+        }
+        .energy-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4fc3f7, #29b6f6);
+            border-radius: 20px;
+            transition: width 0.15s;
+        }
+        .energy-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #8a9aaa;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            width: 100%;
+            margin-top: 10px;
+            background: rgba(26, 34, 46, 0.6);
+            border-radius: 16px;
+            padding: 10px;
+            backdrop-filter: blur(4px);
+            border: 1px solid #2a3a4a;
+        }
+        .stats-item {
+            text-align: center;
+            background: rgba(15, 21, 30, 0.5);
+            padding: 6px 0;
+            border-radius: 10px;
+            border: 1px solid #1a2a3a;
+        }
+        .stats-item .label { font-size: 10px; color: #7a8a9e; }
+        .stats-item .value { font-size: 16px; font-weight: 600; color: #e0e0e0; }
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 8px;
+        }
+        .shop-card {
+            background: rgba(26, 34, 46, 0.7);
+            border-radius: 14px;
+            padding: 12px 8px;
+            text-align: center;
+            border: 1px solid #2a3a4a;
+            transition: 0.2s;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+        }
+        .shop-card:hover { border-color: #f7b731; transform: translateY(-2px); }
+        .shop-card .icon { font-size: 24px; color: #f7b731; margin-bottom: 2px; }
+        .shop-card .name { font-weight: 600; font-size: 13px; }
+        .shop-card .desc { font-size: 10px; color: #8a9aaa; margin: 2px 0 4px; }
+        .shop-card .price {
+            display: inline-block;
+            background: rgba(15, 21, 30, 0.6);
+            padding: 2px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            border: 1px solid #2a3a4a;
+            color: #f7b731;
+        }
+        .shop-card .price i { margin-right: 4px; }
+        .shop-card .level { font-size: 10px; color: #4fc3f7; margin-top: 3px; }
+        .shop-card.disabled { opacity: 0.4; pointer-events: none; }
+        .diamond-shop .shop-card .icon { color: #4fc3f7; }
+        .diamond-shop .shop-card .price { border-color: #4fc3f7; color: #4fc3f7; }
+        .leaderboard-list { margin-top: 6px; max-height: 300px; overflow-y: auto; }
+        .leader-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 14px;
+            background: rgba(26, 34, 46, 0.6);
+            border-radius: 10px;
+            margin-bottom: 4px;
+            border-left: 4px solid #f7b731;
+            backdrop-filter: blur(4px);
+        }
+        .leader-item .rank { font-weight: 700; color: #f7b731; width: 28px; font-size: 13px; }
+        .leader-item .name { flex:1; margin-left: 8px; font-size: 13px; }
+        .leader-item .score { font-weight: 600; font-size: 13px; }
+        .settings-group {
+            background: rgba(26, 34, 46, 0.6);
+            border-radius: 14px;
+            padding: 14px;
+            margin-top: 8px;
+            backdrop-filter: blur(4px);
+            border: 1px solid #2a3a4a;
+        }
+        .settings-group label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 4px;
+            color: #aabaca;
+        }
+        .settings-group input {
+            width: 100%;
+            padding: 8px 12px;
+            background: rgba(15, 21, 30, 0.6);
+            border: 1px solid #2a3a4a;
+            border-radius: 10px;
+            color: #e0e0e0;
+            font-size: 14px;
+            outline: none;
+        }
+        .settings-group input:focus { border-color: #f7b731; }
+        .settings-group .btn {
+            margin-top: 8px;
+            background: linear-gradient(135deg, #f7b731, #f5a623);
+            color: #0b0e14;
+            border: none;
+            padding: 10px;
+            border-radius: 30px;
+            font-weight: 700;
+            font-size: 14px;
+            width: 100%;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .settings-group .btn:hover { transform: scale(1.02); }
+        .settings-group .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+        }
+        .settings-group .btn-danger:hover { background: linear-gradient(135deg, #c0392b, #e74c3c); }
+        #adminPanel {
+            display: none;
+            margin-top: 12px;
+            border-top: 2px solid #2a3a4a;
+            padding-top: 12px;
+        }
+        #adminPanel.show { display: block; }
+        .admin-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+        }
+        .admin-grid .admin-item {
+            background: rgba(15, 21, 30, 0.5);
+            padding: 8px;
+            border-radius: 10px;
+            text-align: center;
+        }
+        .admin-grid .admin-item label { font-size: 10px; color: #8a9aaa; }
+        .admin-grid .admin-item input {
+            width: 100%;
+            padding: 4px;
+            background: rgba(26, 34, 46, 0.6);
+            border: 1px solid #2a3a4a;
+            border-radius: 6px;
+            color: #e0e0e0;
+            margin-top: 4px;
+            text-align: center;
+            font-size: 13px;
+        }
+        .admin-grid .admin-item .btn-small {
+            margin-top: 4px;
+            background: #4fc3f7;
+            border: none;
+            padding: 2px 10px;
+            border-radius: 16px;
+            font-weight: 600;
+            color: #0b0e14;
+            cursor: pointer;
+            font-size: 11px;
+        }
+        .bottom-nav {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(26, 34, 46, 0.9);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: space-around;
+            padding: 6px 0 10px;
+            border-top: 2px solid #2a3a4a;
+        }
+        .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 10px;
+            color: #7a8a9e;
+            cursor: pointer;
+            padding: 2px 8px;
+            border-radius: 16px;
+            transition: 0.2s;
+            background: transparent;
+            border: none;
+            gap: 1px;
+        }
+        .nav-item i { font-size: 20px; }
+        .nav-item.active { color: #f7b731; background: rgba(15, 21, 30, 0.5); }
+        .nav-item.active i { color: #f7b731; }
+        .float-text {
+            position: fixed;
+            pointer-events: none;
+            font-size: 24px;
+            font-weight: 700;
+            color: #f7b731;
+            text-shadow: 0 0 30px rgba(247, 183, 49, 0.6);
+            animation: floatUp 0.8s ease-out forwards;
+            z-index: 100;
+        }
+        @keyframes floatUp {
+            0% { opacity:1; transform: translateY(0) scale(1); }
+            100% { opacity:0; transform: translateY(-100px) scale(1.4); }
+        }
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-8px); }
+            50% { transform: translateX(8px); }
+            75% { transform: translateX(-4px); }
+            100% { transform: translateX(0); }
+        }
+        .chest-btn {
+            background: linear-gradient(135deg, #f7b731, #f5a623);
+            border: none;
+            padding: 12px;
+            border-radius: 30px;
+            font-weight: 700;
+            font-size: 16px;
+            width: 100%;
+            cursor: pointer;
+            color: #0b0e14;
+            margin-top: 8px;
+            transition: 0.2s;
+        }
+        .chest-btn:hover { transform: scale(1.02); }
+        .chest-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .auth-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 400px;
+            padding: 20px;
+            background: radial-gradient(circle at 30% 40%, #1a2a3a, #0b0e14);
+            border-radius: 28px;
+        }
+        .auth-screen h2 {
+            color: #f7b731;
+            margin-bottom: 20px;
+            font-size: 26px;
+            text-shadow: 0 0 30px rgba(247, 183, 49, 0.3);
+        }
+        .auth-screen .input-group {
+            width: 100%;
+            position: relative;
+            margin-bottom: 12px;
+        }
+        .auth-screen .input-group input {
+            width: 100%;
+            padding: 14px 40px 14px 14px;
+            background: rgba(15, 21, 30, 0.7);
+            border: 1px solid #2a3a4a;
+            border-radius: 14px;
+            color: #e0e0e0;
+            font-size: 16px;
+            outline: none;
+        }
+        .auth-screen .input-group input:focus { border-color: #f7b731; }
+        .auth-screen .input-group .toggle-password {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            cursor: pointer;
+            color: #8a9aaa;
+            background: none;
+            border: none;
+            font-size: 18px;
+        }
+        .auth-screen .btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 14px;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .auth-screen .btn-primary {
+            background: linear-gradient(135deg, #f7b731, #f5a623);
+            color: #0b0e14;
+        }
+        .auth-screen .btn-primary:hover { transform: scale(1.02); }
+        .auth-screen .error {
+            color: #e74c3c;
+            font-size: 14px;
+            margin-bottom: 10px;
+            min-height: 20px;
+        }
+        .profile-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .profile-item {
+            background: rgba(15, 21, 30, 0.5);
+            padding: 8px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid #2a3a4a;
+        }
+        .profile-item .label { font-size: 10px; color: #8a9aaa; }
+        .profile-item .value { font-size: 14px; font-weight: 600; margin-top: 2px; }
+        @media (max-width:420px) {
+            .header .balance span { font-size: 11px; padding: 2px 6px; }
+            .big-balance { font-size: 18px; gap: 14px; padding: 4px 12px; }
+            .click-coin { width: 100px; height: 100px; font-size: 44px; }
+            .shop-grid { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ЭКРАН ВХОДА (только вход, регистрация автоматическая) -->
+<div id="authScreen" class="auth-screen">
+    <h2>🔐 CryptoClicker</h2>
+    <div class="error" id="authError"></div>
+    <div class="input-group">
+        <input type="text" id="authNick" placeholder="Никнейм">
+    </div>
+    <div class="input-group">
+        <input type="password" id="authPass" placeholder="Пароль">
+        <button class="toggle-password" id="togglePassBtn"><i class="fas fa-eye"></i></button>
+    </div>
+    <button class="btn btn-primary" id="authLoginBtn">Войти</button>
+    <!-- Кнопка регистрации удалена -->
+</div>
+
+<!-- ОСНОВНАЯ ИГРА -->
+<div id="app">
+    <div class="header">
+        <div class="title"><i class="fas fa-bolt" style="color:#f7b731;margin-right:4px;"></i>CryptoClicker</div>
+        <div class="balance">
+            <span><i class="fas fa-coins"></i> <span id="headerCoins">0</span></span>
+            <span><i class="fas fa-gem"></i> <span id="headerDiamonds">0</span></span>
+            <span style="font-size:10px; background:transparent; border:none; padding:0;">👤 <span id="headerNick">Игрок</span></span>
+        </div>
+    </div>
+    <div class="content">
+        <!-- Главная -->
+        <div id="tabMain" class="tab active">
+            <div class="click-area">
+                <div class="big-balance">
+                    <span class="coins"><i class="fas fa-coins"></i> <span id="mainCoins">0</span></span>
+                    <span class="diamonds"><i class="fas fa-gem"></i> <span id="mainDiamonds">0</span></span>
+                </div>
+                <div class="diamond-timer" id="diamondTimer">⏳ Следующий алмаз через: 10:00</div>
+                <div class="click-coin" id="clickCoin"><i class="fas fa-coins"></i><i class="fas fa-bolt"></i></div>
+                <div class="energy-bar"><div class="energy-fill" id="energyFill" style="width:100%"></div></div>
+                <div class="energy-text"><span>⚡ Энергия</span><span id="energyLabel">100 / 100</span></div>
+                <div class="stats">
+                    <div class="stats-item"><div class="label">Кликов</div><div class="value" id="statClicks">0</div></div>
+                    <div class="stats-item"><div class="label">Доход за клик</div><div class="value" id="statClickPower">1</div></div>
+                    <div class="stats-item"><div class="label">Макс. энергия</div><div class="value" id="statMaxEnergy">100</div></div>
+                    <div class="stats-item"><div class="label">Доход в сек</div><div class="value" id="statIncomePerSec">0</div></div>
+                </div>
+            </div>
+        </div>
+        <!-- Магазин монет -->
+        <div id="tabShop" class="tab"><h3 style="margin-bottom:4px;font-size:15px;color:#f7b731;"><i class="fas fa-store"></i> Магазин</h3><div class="shop-grid" id="shopGrid"></div></div>
+        <!-- Алмазный магазин -->
+        <div id="tabDiamond" class="tab">
+            <h3 style="margin-bottom:4px;font-size:15px;color:#4fc3f7;"><i class="fas fa-gem"></i> Алмазные улучшения</h3>
+            <div class="shop-grid diamond-shop" id="diamondShop"></div>
+            <div style="margin-top:10px; background:rgba(26,34,46,0.6); border-radius:14px; padding:12px; border:1px solid #2a3a4a;">
+                <h4 style="color:#4fc3f7; font-size:13px;">Ускорение алмазов</h4>
+                <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:4px; color:#aabaca;">
+                    <span>Текущий интервал: <span id="diamondIntervalDisplay" style="color:#f7b731;">10</span> мин</span>
+                </div>
+                <div class="shop-grid" style="margin-top:6px;" id="diamondSpeedShop"></div>
+            </div>
+        </div>
+        <!-- Сундук -->
+        <div id="tabChest" class="tab">
+            <h3 style="margin-bottom:4px;font-size:15px;color:#f7b731;"><i class="fas fa-box"></i> Сундуки</h3>
+            <div style="background:rgba(26,34,46,0.6); border-radius:14px; padding:14px; margin-top:6px; border:1px solid #2a3a4a; text-align:center;">
+                <p style="font-size:13px; color:#aabaca;">Открой сундук за 10 💎 и получи от 2000 до 20000 монет!</p>
+                <button class="chest-btn" id="openChestBtn">🎁 Открыть (10 💎)</button>
+                <div id="chestResult" style="margin-top:10px; font-size:18px; font-weight:700; color:#f7b731;"></div>
+            </div>
+        </div>
+        <!-- Лидеры -->
+        <div id="tabLeaders" class="tab"><h3 style="margin-bottom:4px;font-size:15px;color:#f7b731;"><i class="fas fa-trophy"></i> Таблица лидеров</h3><div class="leaderboard-list" id="leaderList"></div></div>
+        <!-- Профиль -->
+        <div id="tabProfile" class="tab">
+            <h3 style="margin-bottom:4px;font-size:15px;color:#4fc3f7;"><i class="fas fa-user"></i> Профиль</h3>
+            <div class="profile-grid">
+                <div class="profile-item"><div class="label">Игрок</div><div class="value" id="profileNick">-</div></div>
+                <div class="profile-item"><div class="label">Зарегистрирован</div><div class="value" id="profileRegistered">-</div></div>
+                <div class="profile-item"><div class="label">Кликов</div><div class="value" id="profileClicks">0</div></div>
+                <div class="profile-item"><div class="label">Открыто сундуков</div><div class="value" id="profileChests">0</div></div>
+                <div class="profile-item" style="grid-column:span 2;"><div class="label">Время в игре</div><div class="value" id="profileTime">0 мин</div></div>
+            </div>
+        </div>
+        <!-- Настройки -->
+        <div id="tabSettings" class="tab">
+            <h3 style="margin-bottom:4px;font-size:15px;color:#f7b731;"><i class="fas fa-cog"></i> Настройки</h3>
+            <div class="settings-group">
+                <label>Ваш ник: <strong id="settingsNick" style="color:#f7b731;">Игрок</strong></label>
+                <button class="btn btn-danger" id="logoutBtn">Выйти из аккаунта</button>
+            </div>
+            <div class="settings-group">
+                <label>Админ-доступ</label>
+                <input type="password" id="adminCodeInput" placeholder="Введите код" maxlength="4">
+                <button class="btn btn-danger" id="adminUnlockBtn">Войти</button>
+            </div>
+            <div id="adminPanel">
+                <h4 style="color:#f7b731;font-size:13px;"><i class="fas fa-user-shield"></i> Админ-панель</h4>
+                <div class="admin-grid">
+                    <div class="admin-item"><label>Ник игрока</label><input type="text" id="adminNick" placeholder="Ник"></div>
+                    <div class="admin-item" style="grid-column:span 2;"><label>Монеты</label><div style="display:flex; gap:3px; flex-wrap:wrap;"><input type="number" id="adminCoins" value="0" style="flex:1; min-width:60px;"><button class="btn-small" id="adminSetCoins">Уст.</button><button class="btn-small" id="adminAddCoinsBtn">+</button><button class="btn-small" id="adminSubCoinsBtn">-</button></div></div>
+                    <div class="admin-item" style="grid-column:span 2;"><label>Алмазы</label><div style="display:flex; gap:3px; flex-wrap:wrap;"><input type="number" id="adminDiamonds" value="0" style="flex:1; min-width:60px;"><button class="btn-small" id="adminSetDiamonds">Уст.</button><button class="btn-small" id="adminAddDiamondsBtn">+</button><button class="btn-small" id="adminSubDiamondsBtn">-</button></div></div>
+                    <div class="admin-item"><label>Клик-пауэр</label><input type="number" id="adminClickPower" value="1"><button class="btn-small" data-target="clickPower">Уст.</button></div>
+                    <div class="admin-item"><label>Макс. энергия</label><input type="number" id="adminMaxEnergy" value="100"><button class="btn-small" data-target="maxEnergy">Уст.</button></div>
+                </div>
+                <button class="btn btn-danger" id="adminResetBtn" style="margin-top:6px;font-size:13px;padding:6px;">Сбросить свой прогресс</button>
+                <button class="btn btn-danger" id="adminClearLeaderboardBtn" style="margin-top:6px;font-size:13px;padding:6px;background:#e67e22;">Очистить лидерборд</button>
+            </div>
+        </div>
+    </div>
+    <div class="bottom-nav">
+        <button class="nav-item active" data-tab="tabMain"><i class="fas fa-home"></i> Главная</button>
+        <button class="nav-item" data-tab="tabShop"><i class="fas fa-store"></i> Магазин</button>
+        <button class="nav-item" data-tab="tabDiamond"><i class="fas fa-gem"></i> Алмазы</button>
+        <button class="nav-item" data-tab="tabChest"><i class="fas fa-box"></i> Сундук</button>
+        <button class="nav-item" data-tab="tabLeaders"><i class="fas fa-trophy"></i> Лидеры</button>
+        <button class="nav-item" data-tab="tabProfile"><i class="fas fa-user"></i> Профиль</button>
+        <button class="nav-item" data-tab="tabSettings"><i class="fas fa-cog"></i> Настройки</button>
+    </div>
+</div>
+
+<script>
+// ================================================================
+//  ПОДКЛЮЧЕНИЕ К FIREBASE
+// ================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyF53aFyEX-od8kbmNHzBTNwtpMFKdPLs",
+  authDomain: "crypto-clicker-game-d952e.firebaseapp.com",
+  databaseURL: "https://crypto-clicker-game-d952e-default-rtdb.firebaseio.com",
+  projectId: "crypto-clicker-game-d952e",
+  storageBucket: "crypto-clicker-game-d952e.firebasestorageapi",
+  messagingSenderId: "1034077574733",
+  appId: "1:1034077574733:web:c09493fcb59f72bd2c6e04",
+  measurementId: "G-0Z3ZRDQ0PD"
+};
+
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// ================================================================
+//  ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+// ================================================================
+let currentUser = null;
+let game = null;
+let leaderboardCache = null;
+let leaderboardCacheTime = 0;
+
+// ================================================================
+//  ЭКРАН ВХОДА (только вход, регистрация автоматическая)
+// ================================================================
+const authScreen = document.getElementById('authScreen');
+const appEl = document.getElementById('app');
+const authError = document.getElementById('authError');
+const authNick = document.getElementById('authNick');
+const authPass = document.getElementById('authPass');
+const authLoginBtn = document.getElementById('authLoginBtn');
+const togglePassBtn = document.getElementById('togglePassBtn');
+
+// Показать/скрыть пароль
+let passVisible = false;
+togglePassBtn.addEventListener('click', () => {
+    passVisible = !passVisible;
+    authPass.type = passVisible ? 'text' : 'password';
+    togglePassBtn.innerHTML = passVisible ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+});
+
+// ================================================================
+//  ФУНКЦИИ РАБОТЫ С FIREBASE
+// ================================================================
+function loadUserData(nick) {
+    return new Promise((resolve) => {
+        database.ref('users/' + nick).once('value', snapshot => {
+            resolve(snapshot.val());
+        });
+    });
+}
+
+function saveUserData(nick, data) {
+    database.ref('users/' + nick).set(data);
+}
+
+function loadAllUsers() {
+    return new Promise((resolve) => {
+        database.ref('users').once('value', snapshot => {
+            resolve(snapshot.val() || {});
+        });
+    });
+}
+
+function clearAllUsers() {
+    return new Promise((resolve) => {
+        database.ref('users').set({}, resolve);
+    });
+}
+
+// ================================================================
+//  АВТОРИЗАЦИЯ (единая кнопка)
+// ================================================================
+authLoginBtn.addEventListener('click', async () => {
+    const nick = authNick.value.trim();
+    const pass = authPass.value.trim();
+    if (!nick || !pass) { authError.textContent = 'Заполните все поля'; return; }
+    if (nick.length < 3) { authError.textContent = 'Ник минимум 3 символа'; return; }
+    if (pass.length < 4) { authError.textContent = 'Пароль минимум 4 символа'; return; }
+
+    const data = await loadUserData(nick);
+    if (data) {
+        // Пользователь существует – проверяем пароль
+        if (data.password !== pass) {
+            authError.textContent = 'Неверный пароль';
+            return;
+        }
+        authError.textContent = '';
+        currentUser = nick;
+        game = data.game || getDefaultGame();
+        // Убеждаемся, что бренды обнулены (для совместимости)
+        if (game.brands) {
+            for (let b in game.brands) game.brands[b].level = 0;
+        } else {
+            game.brands = getDefaultGame().brands;
+        }
+        enterGame();
+    } else {
+        // Новый пользователь – создаём
+        const newGame = getDefaultGame();
+        // Обнуляем бренды
+        for (let b in newGame.brands) newGame.brands[b].level = 0;
+        await saveUserData(nick, { password: pass, game: newGame });
+        currentUser = nick;
+        game = newGame;
+        authError.textContent = '';
+        enterGame();
+    }
+});
+
+// ================================================================
+//  ИГРОВЫЕ ФУНКЦИИ
+// ================================================================
+function getDefaultGame() {
+    return {
+        coins: 0,
+        clickPower: 1,
+        energy: 100,
+        maxEnergy: 100,
+        diamonds: 0,
+        totalClicks: 0,
+        // Доход в секунду (автокликер)
+        incomeLevel: 0,          // уровень дохода в секунду (0 = нет)
+        // Алмазные улучшения
+        diamondAutoLevel: 0,     // уровни мощного клика (до 5)
+        diamondIncomeLevel: 0,   // уровни ускорения дохода (до 10)
+        // Ускорение алмазов
+        diamondSpeedLevel: 0,    // 0..5
+        regenLevel: 0,
+        lastDiamondTime: Date.now(),
+        chestOpened: 0,
+        registeredAt: Date.now(),
+        brands: { nike: { level: 0 }, adidas: { level: 0 }, puma: { level: 0 }, reebok: { level: 0 } } // не используется
+    };
+}
+
+function enterGame() {
+    authScreen.style.display = 'none';
+    appEl.style.display = 'block';
+    document.getElementById('headerNick').textContent = currentUser;
+    document.getElementById('settingsNick').textContent = currentUser;
+    updateProfile();
+    initGame();
+}
+
+function saveGame() {
+    if (!currentUser) return;
+    saveUserData(currentUser, { password: '****', game: game });
+}
+
+function initGame() {
+    const def = getDefaultGame();
+    for (let key in def) {
+        if (!(key in game)) game[key] = def[key];
+    }
+    // Убеждаемся, что бренды обнулены
+    if (!game.brands) game.brands = def.brands;
+    for (let b in def.brands) {
+        if (!game.brands[b]) game.brands[b] = { level: 0 };
+        game.brands[b].level = 0;
+    }
+    saveGame();
+    updateUI();
+
+    // Интервал для дохода в секунду (incomeLevel)
+    if (game.incomeLevel > 0 && !window._incomeInterval) {
+        window._incomeInterval = setInterval(() => {
+            if (game.incomeLevel > 0) {
+                // доход в секунду = incomeLevel * 10
+                game.coins += game.incomeLevel * 10;
+                saveGame();
+                updateUI();
+            }
+        }, 1000);
+    }
+
+    // Регенерация энергии
+    if (!window._energyInterval) {
+        window._energyInterval = setInterval(() => {
+            const regen = getRegenPerSecond() / 10;
+            if (game.energy < game.maxEnergy) {
+                game.energy = Math.min(game.maxEnergy, game.energy + regen);
+                saveGame();
+                updateUI();
+            }
+        }, 100);
+    }
+
+    // Алмазы по таймеру (без выпадения при клике)
+    if (!window._diamondInterval) {
+        window._diamondInterval = setInterval(() => {
+            const now = Date.now();
+            const interval = getDiamondInterval() * 60 * 1000;
+            const diff = now - (game.lastDiamondTime || now);
+            if (diff >= interval) {
+                game.diamonds += 1;
+                game.lastDiamondTime = now;
+                saveGame();
+                updateUI();
+                spawnFloatText('💎 +1', { clientX: window.innerWidth-50, clientY: 50 });
+            }
+        }, 10000);
+    }
+    if (!window._diamondTimerInterval) {
+        window._diamondTimerInterval = setInterval(() => {
+            updateDiamondTimer();
+        }, 1000);
+    }
+
+    // Обработчики
+    document.getElementById('clickCoin').addEventListener('click', function(e) {
+        clickCoin(e);
+    });
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            this.classList.add('active');
+            const tabId = this.dataset.tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+        });
+    });
+    setupAdmin();
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    document.getElementById('openChestBtn').addEventListener('click', openChest);
+}
+
+// ================================================================
+//  ПРОФИЛЬ
+// ================================================================
+function updateProfile() {
+    if (!currentUser || !game) return;
+    document.getElementById('profileNick').textContent = currentUser;
+    const regDate = new Date(game.registeredAt || Date.now());
+    document.getElementById('profileRegistered').textContent = regDate.toLocaleDateString() + ' ' + regDate.toLocaleTimeString();
+    document.getElementById('profileClicks').textContent = formatNumber(game.totalClicks || 0);
+    document.getElementById('profileChests').textContent = game.chestOpened || 0;
+    const seconds = Math.floor((Date.now() - (game.registeredAt || Date.now())) / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    if (hours > 0) document.getElementById('profileTime').textContent = hours + 'ч ' + (minutes % 60) + 'м';
+    else document.getElementById('profileTime').textContent = minutes + ' мин';
+}
+
+// ================================================================
+//  ОБНОВЛЕНИЕ UI
+// ================================================================
+function updateUI() {
+    if (!game) return;
+    const coinsStr = formatNumber(game.coins);
+    const diaStr = formatNumber(game.diamonds);
+    document.getElementById('headerCoins').textContent = coinsStr;
+    document.getElementById('headerDiamonds').textContent = diaStr;
+    document.getElementById('mainCoins').textContent = coinsStr;
+    document.getElementById('mainDiamonds').textContent = diaStr;
+    const pct = (game.energy / game.maxEnergy) * 100;
+    document.getElementById('energyFill').style.width = pct + '%';
+    document.getElementById('energyLabel').textContent = Math.floor(game.energy) + ' / ' + game.maxEnergy;
+    document.getElementById('statClicks').textContent = formatNumber(game.totalClicks);
+    document.getElementById('statClickPower').textContent = formatNumber(game.clickPower);
+    document.getElementById('statMaxEnergy').textContent = game.maxEnergy;
+    // Доход в секунду: incomeLevel * 10
+    const incomePerSec = (game.incomeLevel || 0) * 10;
+    document.getElementById('statIncomePerSec').textContent = formatNumber(incomePerSec);
+    renderShop();
+    renderDiamondShop();
+    renderDiamondSpeedShop();
+    renderLeaderboard();
+    updateProfile();
+    document.getElementById('adminCoins').value = game.coins;
+    document.getElementById('adminDiamonds').value = game.diamonds;
+    document.getElementById('adminClickPower').value = game.clickPower;
+    document.getElementById('adminMaxEnergy').value = game.maxEnergy;
+    document.getElementById('clickCoin').style.opacity = game.energy >= 1 ? '1' : '0.6';
+    updateDiamondTimer();
+    saveGame();
+}
+
+function formatNumber(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return Math.floor(n).toString();
+}
+
+// ================================================================
+//  КЛИК ПО МОНЕТЕ (без выпадения алмазов)
+// ================================================================
+function clickCoin(e) {
+    if (game.energy < 1) {
+        shakeElement(document.getElementById('clickCoin'));
+        return;
+    }
+    game.energy -= 1;
+    game.coins += game.clickPower;
+    game.totalClicks += 1;
+    // Убрано выпадение алмазов!
+    spawnFloatText('+' + formatNumber(game.clickPower), e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+    playClickSound();
+    updateUI();
+}
+
+function shakeElement(el) {
+    el.style.animation = 'none';
+    void el.offsetHeight;
+    el.style.animation = 'shake 0.2s';
+    setTimeout(() => el.style.animation = '', 300);
+}
+
+function spawnFloatText(text, ev) {
+    const el = document.createElement('div');
+    el.className = 'float-text';
+    el.textContent = text;
+    const x = ev.clientX || window.innerWidth/2;
+    const y = ev.clientY || window.innerHeight/2 - 40;
+    el.style.left = (x - 30 + (Math.random()*40-20)) + 'px';
+    el.style.top = (y - 20) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+}
+
+// ================================================================
+//  ЗВУКИ (клик и покупка)
+// ================================================================
+let audioCtx = null;
+function playClickSound() {
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        // Две ноты для приятного звука
+        const notes = [523, 659]; // до, ми
+        notes.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime + i * 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.06 + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + i * 0.06);
+            osc.stop(audioCtx.currentTime + i * 0.06 + 0.1);
+        });
+    } catch(e) {}
+}
+
+function playPurchaseSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const notes = [523, 659, 784, 1047];
+        notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.1, ctx.currentTime + i * 0.08);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.15);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + i * 0.08);
+            osc.stop(ctx.currentTime + i * 0.08 + 0.15);
+        });
+    } catch(e) {}
+}
+
+// ================================================================
+//  МАГАЗИН (монеты)
+// ================================================================
+// Сила клика: линейная цена
+function getClickPowerCost() {
+    const level = game.clickPower - 1; // уровень (0,1,2,...)
+    return 10 + level * 5; // 10, 15, 20, 25, ...
+}
+function buyPower() {
+    const cost = getClickPowerCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.clickPower += 1;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+// Энергия: оставляем как было (экспонента, но можно переделать)
+function getMaxEnergyCost() {
+    const level = Math.floor((game.maxEnergy - 100) / 20);
+    return Math.floor(25 * Math.pow(1.5, level));
+}
+function buyMaxEnergy() {
+    const cost = getMaxEnergyCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.maxEnergy += 20;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+// Регенерация
+function getRegenCost() {
+    return Math.floor(30 * Math.pow(1.5, game.regenLevel || 0));
+}
+function getRegenPerSecond() {
+    return 0.3 + (game.regenLevel || 0) * 0.05;
+}
+function buyRegen() {
+    const cost = getRegenCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.regenLevel = (game.regenLevel || 0) + 1;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+
+// Доход в секунду (автокликер)
+function getIncomeLevel() { return game.incomeLevel || 0; }
+function getIncomeCost() {
+    const level = getIncomeLevel();
+    return (level + 1) * 1000; // 1000, 2000, 3000, ...
+}
+function buyIncome() {
+    const level = getIncomeLevel();
+    if (level >= 50) return; // максимум 50 уровней
+    const cost = getIncomeCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.incomeLevel = level + 1;
+        // Перезапускаем интервал
+        if (window._incomeInterval) clearInterval(window._incomeInterval);
+        window._incomeInterval = setInterval(() => {
+            if (game.incomeLevel > 0) {
+                game.coins += game.incomeLevel * 10;
+                saveGame();
+                updateUI();
+            }
+        }, 1000);
+        playPurchaseSound();
+        updateUI();
+    }
+}
+
+function renderShop() {
+    const container = document.getElementById('shopGrid');
+    container.innerHTML = '';
+    const items = [
+        { name:'Сила клика', icon:'fa-hand-fist', desc:'+1 к доходу', cost:getClickPowerCost(), level:game.clickPower-1, buy:buyPower },
+        { name:'Запас энергии', icon:'fa-battery-full', desc:'+20 к макс.', cost:getMaxEnergyCost(), level:game.maxEnergy, buy:buyMaxEnergy },
+        { name:'Регенерация', icon:'fa-bolt', desc:'+0.05/сек', cost:getRegenCost(), level:game.regenLevel||0, buy:buyRegen },
+        { name:'Доход в сек', icon:'fa-clock', desc:'+10/сек', cost:getIncomeCost(), level:game.incomeLevel||0, buy:buyIncome }
+    ];
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'shop-card' + (game.coins >= item.cost ? '' : ' disabled');
+        div.innerHTML = `
+            <div class="icon"><i class="fas ${item.icon}"></i></div>
+            <div class="name">${item.name}</div>
+            <div class="desc">${item.desc}</div>
+            <div class="price"><i class="fas fa-coins"></i> ${formatNumber(item.cost)}</div>
+            <div class="level">Уровень ${item.level}</div>
+        `;
+        if (game.coins >= item.cost) div.addEventListener('click', item.buy);
+        container.appendChild(div);
+    });
+}
+
+// ================================================================
+//  АЛМАЗНЫЙ МАГАЗИН
+// ================================================================
+// 1) Мощный клик (+10 к силе клика), 5 уровней, цены: 10,20,30,40,50
+function getDiamondAutoCost() {
+    const level = game.diamondAutoLevel || 0;
+    if (level >= 5) return Infinity;
+    return 10 + level * 10; // 10,20,30,40,50
+}
+function buyDiamondAuto() {
+    const level = game.diamondAutoLevel || 0;
+    if (level >= 5) return;
+    const cost = getDiamondAutoCost();
+    if (game.diamonds >= cost) {
+        game.diamonds -= cost;
+        game.diamondAutoLevel = level + 1;
+        game.clickPower += 10;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+
+// 2) Ускорение дохода (за алмазы) — даёт +5 к доходу в секунду за уровень, до 10 уровней, цена 10 алмазов за уровень
+function getDiamondIncomeCost() {
+    const level = game.diamondIncomeLevel || 0;
+    if (level >= 10) return Infinity;
+    return 10; // постоянная цена 10 алмазов
+}
+function buyDiamondIncome() {
+    const level = game.diamondIncomeLevel || 0;
+    if (level >= 10) return;
+    const cost = getDiamondIncomeCost();
+    if (game.diamonds >= cost) {
+        game.diamonds -= cost;
+        game.diamondIncomeLevel = level + 1;
+        // Увеличиваем доход в секунду (incomeLevel) на 5
+        // Но incomeLevel отвечает за уровень, который умножается на 10. Увеличим incomeLevel на 0.5? Лучше создать отдельный множитель.
+        // Чтобы не усложнять, сделаем так: при покупке увеличиваем базовый доход на 5, но мы используем incomeLevel * 10.
+        // Можно увеличить incomeLevel на 0.5 (нецелое). Но это неудобно. Сделаем дополнительный параметр incomeBonus.
+        if (!game.incomeBonus) game.incomeBonus = 0;
+        game.incomeBonus += 5;
+        // Перезапустим интервал, чтобы учесть новый доход
+        if (window._incomeInterval) clearInterval(window._incomeInterval);
+        window._incomeInterval = setInterval(() => {
+            if (game.incomeLevel > 0 || (game.incomeBonus || 0) > 0) {
+                const totalIncome = (game.incomeLevel * 10) + (game.incomeBonus || 0);
+                game.coins += totalIncome;
+                saveGame();
+                updateUI();
+            }
+        }, 1000);
+        playPurchaseSound();
+        updateUI();
+    }
+}
+
+function renderDiamondShop() {
+    const container = document.getElementById('diamondShop');
+    container.innerHTML = '';
+    // Мощный клик
+    const autoLevel = game.diamondAutoLevel || 0;
+    const autoCost = getDiamondAutoCost();
+    const canBuyAuto = game.diamonds >= autoCost && autoLevel < 5;
+    const divAuto = document.createElement('div');
+    divAuto.className = 'shop-card' + (canBuyAuto ? '' : ' disabled');
+    divAuto.innerHTML = `
+        <div class="icon"><i class="fas fa-rocket"></i></div>
+        <div class="name">Мощный клик</div>
+        <div class="desc">+10 к силе клика</div>
+        <div class="price"><i class="fas fa-gem"></i> ${autoCost}</div>
+        <div class="level">Уровень ${autoLevel}/5</div>
+    `;
+    if (canBuyAuto) divAuto.addEventListener('click', buyDiamondAuto);
+    container.appendChild(divAuto);
+
+    // Ускорение дохода
+    const incLevel = game.diamondIncomeLevel || 0;
+    const incCost = getDiamondIncomeCost();
+    const canBuyInc = game.diamonds >= incCost && incLevel < 10;
+    const divInc = document.createElement('div');
+    divInc.className = 'shop-card' + (canBuyInc ? '' : ' disabled');
+    divInc.innerHTML = `
+        <div class="icon"><i class="fas fa-chart-line"></i></div>
+        <div class="name">Ускорение дохода</div>
+        <div class="desc">+5 к доходу/сек</div>
+        <div class="price"><i class="fas fa-gem"></i> ${incCost}</div>
+        <div class="level">Уровень ${incLevel}/10</div>
+    `;
+    if (canBuyInc) divInc.addEventListener('click', buyDiamondIncome);
+    container.appendChild(divInc);
+}
+
+// ================================================================
+//  УСКОРЕНИЕ АЛМАЗОВ (за монеты)
+// ================================================================
+function getDiamondInterval() {
+    const level = game.diamondSpeedLevel || 0;
+    const intervals = [10, 9, 8, 7, 6, 5];
+    return intervals[level] || 10;
+}
+function getDiamondSpeedCost() {
+    const level = game.diamondSpeedLevel || 0;
+    const prices = [1000000, 5000000, 10000000, 20000000, 50000000];
+    return prices[level] || 999999999;
+}
+function buyDiamondSpeed() {
+    const level = game.diamondSpeedLevel || 0;
+    if (level >= 5) return;
+    const cost = getDiamondSpeedCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.diamondSpeedLevel = level + 1;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+function renderDiamondSpeedShop() {
+    const container = document.getElementById('diamondSpeedShop');
+    container.innerHTML = '';
+    const level = game.diamondSpeedLevel || 0;
+    if (level >= 5) {
+        container.innerHTML = '<p style="color:#4fc3f7; font-size:12px; text-align:center;">✅ Максимальный уровень (5 мин)</p>';
+        return;
+    }
+    const cost = getDiamondSpeedCost();
+    const canBuy = game.coins >= cost;
+    const currentInterval = getDiamondInterval();
+    const nextInterval = getDiamondInterval() - 1;
+    const div = document.createElement('div');
+    div.className = 'shop-card' + (canBuy ? '' : ' disabled');
+    div.innerHTML = `
+        <div class="icon"><i class="fas fa-clock"></i></div>
+        <div class="name">Ускорение</div>
+        <div class="desc">${currentInterval} мин → ${nextInterval} мин</div>
+        <div class="price"><i class="fas fa-coins"></i> ${formatNumber(cost)}</div>
+        <div class="level">Уровень ${level}/5</div>
+    `;
+    if (canBuy) div.addEventListener('click', buyDiamondSpeed);
+    container.appendChild(div);
+}
+
+function updateDiamondTimer() {
+    const interval = getDiamondInterval() * 60;
+    const now = Date.now();
+    const last = game.lastDiamondTime || now;
+    const elapsed = (now - last) / 1000;
+    const remaining = Math.max(0, interval - elapsed);
+    const minutes = Math.floor(remaining / 60);
+    const seconds = Math.floor(remaining % 60);
+    document.getElementById('diamondTimer').textContent = `⏳ Следующий алмаз через: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    document.getElementById('diamondIntervalDisplay').textContent = getDiamondInterval();
+}
+
+// ================================================================
+//  СУНДУК
+// ================================================================
+function openChest() {
+    if (game.diamonds < 10) {
+        document.getElementById('chestResult').textContent = '❌ Недостаточно алмазов!';
+        return;
+    }
+    game.diamonds -= 10;
+    const rand = Math.random();
+    let prize = 0;
+    if (rand < 0.60) prize = Math.floor(2000 + Math.random() * 3000);
+    else if (rand < 0.85) prize = Math.floor(5000 + Math.random() * 5000);
+    else if (rand < 0.95) prize = Math.floor(10000 + Math.random() * 5000);
+    else if (rand < 0.99) prize = Math.floor(15000 + Math.random() * 3000);
+    else prize = Math.floor(18000 + Math.random() * 2000);
+    game.coins += prize;
+    game.chestOpened = (game.chestOpened || 0) + 1;
+    document.getElementById('chestResult').textContent = '🎉 Вы выиграли ' + formatNumber(prize) + ' монет!';
+    playPurchaseSound();
+    updateUI();
+}
+
+// ================================================================
+//  ЛИДЕРБОРД
+// ================================================================
+async function renderLeaderboard() {
+    const container = document.getElementById('leaderList');
+    const now = Date.now();
+    if (leaderboardCache && (now - leaderboardCacheTime) < 5000) {
+        container.innerHTML = leaderboardCache;
+        return;
+    }
+    container.innerHTML = 'Загрузка...';
+    const users = await loadAllUsers();
+    const list = [];
+    for (let nick in users) {
+        if (users[nick].game) {
+            list.push({ nickname: nick, coins: users[nick].game.coins || 0 });
+        }
+    }
+    list.sort((a,b) => b.coins - a.coins);
+    const top = list.slice(0, 50);
+    let html = '';
+    if (top.length === 0) {
+        html = '<p style="text-align:center;color:#7a8a9e;font-size:13px;">Пока никого нет</p>';
+    } else {
+        top.forEach((entry, idx) => {
+            const isMe = entry.nickname === currentUser;
+            html += `
+                <div class="leader-item" style="${isMe ? 'border-left-color:#4fc3f7;' : ''}">
+                    <span class="rank">#${idx+1}</span>
+                    <span class="name">${entry.nickname} ${isMe ? '⭐' : ''}</span>
+                    <span class="score">${formatNumber(entry.coins)}</span>
+                </div>
+            `;
+        });
+    }
+    container.innerHTML = html;
+    leaderboardCache = html;
+    leaderboardCacheTime = now;
+}
+
+// ================================================================
+//  АДМИН-ПАНЕЛЬ (с возможностью изменения данных по нику)
+// ================================================================
+let adminUnlocked = false;
+
+function setupAdmin() {
+    document.getElementById('adminUnlockBtn').addEventListener('click', function() {
+        const code = document.getElementById('adminCodeInput').value;
+        if (code === '0000') {
+            adminUnlocked = true;
+            document.getElementById('adminPanel').classList.add('show');
+            document.getElementById('adminCodeInput').value = '';
+            alert('Доступ получен');
+            updateUI();
+        } else {
+            alert('Неверный код');
+        }
+    });
+
+    // Вспомогательная функция для применения изменений к указанному нику
+    async function applyToUser(action) {
+        if (!adminUnlocked) return;
+        const targetNick = document.getElementById('adminNick').value.trim();
+        if (!targetNick) {
+            alert('Введите ник игрока');
+            return;
+        }
+        const data = await loadUserData(targetNick);
+        if (!data) {
+            alert('Пользователь не найден');
+            return;
+        }
+        const targetGame = data.game || getDefaultGame();
+        // Применяем действие
+        action(targetGame);
+        // Сохраняем
+        await saveUserData(targetNick, { password: data.password, game: targetGame });
+        // Если это текущий игрок – обновляем game
+        if (targetNick === currentUser) {
+            game = targetGame;
+            updateUI();
+        } else {
+            alert('Изменения применены к игроку ' + targetNick);
+        }
+        // Обновим лидерборд
+        leaderboardCache = null;
+    }
+
+    document.getElementById('adminSetCoins').addEventListener('click', function() {
+        const val = parseFloat(document.getElementById('adminCoins').value);
+        if (isNaN(val) || val < 0) return;
+        applyToUser((g) => { g.coins = Math.floor(val); });
+    });
+
+    document.getElementById('adminAddCoinsBtn').addEventListener('click', function() {
+        const val = parseFloat(document.getElementById('adminCoins').value);
+        if (isNaN(val) || val < 0) return;
+        applyToUser((g) => { g.coins += Math.floor(val); });
+    });
+
+    document.getElementById('adminSubCoinsBtn').addEventListener('click', function() {
+        const val = parseFloat(document.getElementById('adminCoins').value);
+        if (isNaN(val) || val < 0) return;
+        applyToUser((g) => { g.coins = Math.max(0, g.coins - Math.floor(val)); });
+    });
+
+    document.getElementById('adminSetDiamonds').addEventListener('click', function() {
+        const val = parseFloat(document.getElementById('adminDiamonds').value);
+        if (isNaN(val) || val < 0) return;
+        applyToUser((g) => { g.diamonds = Math.floor(val); });
+    });
+
+    document.getElementById('adminAddDiamondsBtn').addEventListener('click', function() {
+        const val = parseFloat(document.getElementById('adminDiamonds').value);
+        if (isNaN(val) || val < 0) return;
+        applyToUser((g) => { g.diamonds += Math.floor(val); });
+    });
+
+    document.getElementById('adminSubDiamondsBtn').addEventListener('click', function() {
+        const val = parseFloat(document.getElementById('adminDiamonds').value);
+        if (isNaN(val) || val < 0) return;
+        applyToUser((g) => { g.diamonds = Math.max(0, g.diamonds - Math.floor(val)); });
+    });
+
+    // Для быстрых изменений текущего игрока (если ник не указан)
+    document.querySelectorAll('.admin-grid .btn-small[data-target]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (!adminUnlocked) return;
+            const target = this.dataset.target;
+            const input = document.getElementById('admin' + target.charAt(0).toUpperCase() + target.slice(1));
+            let val = parseFloat(input.value);
+            if (isNaN(val)) return;
+            // Если указан ник, применяем к нему, иначе к текущему
+            const targetNick = document.getElementById('adminNick').value.trim();
+            if (targetNick) {
+                applyToUser((g) => {
+                    if (target === 'clickPower') {
+                        val = Math.max(1, Math.floor(val));
+                        g.clickPower = val;
+                    } else if (target === 'maxEnergy') {
+                        val = Math.max(10, Math.floor(val));
+                        g.maxEnergy = val;
+                        if (g.energy > g.maxEnergy) g.energy = g.maxEnergy;
+                    }
+                });
+            } else {
+                // Применяем к текущему
+                if (target === 'clickPower') {
+                    val = Math.max(1, Math.floor(val));
+                    game.clickPower = val;
+                } else if (target === 'maxEnergy') {
+                    val = Math.max(10, Math.floor(val));
+                    game.maxEnergy = val;
+                    if (game.energy > game.maxEnergy) game.energy = game.maxEnergy;
+                }
+                updateUI();
+            }
+        });
+    });
+
+    document.getElementById('adminResetBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        if (confirm('Сбросить свой прогресс?')) {
+            const def = getDefaultGame();
+            for (let key in def) game[key] = def[key];
+            game.brands = def.brands;
+            for (let b in game.brands) game.brands[b].level = 0;
+            game.registeredAt = Date.now();
+            updateUI();
+            alert('Сброшено');
+        }
+    });
+
+    document.getElementById('adminClearLeaderboardBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        if (confirm('Удалить всех игроков из таблицы лидеров? (Ваш прогресс сохранится)')) {
+            clearAllUsers().then(() => {
+                if (currentUser) {
+                    saveUserData(currentUser, { password: '****', game: game });
+                }
+                leaderboardCache = null;
+                updateUI();
+                alert('Лидерборд очищен');
+            });
+        }
+    });
+}
+
+// ================================================================
+//  ВЫХОД
+// ================================================================
+function logout() {
+    if (confirm('Выйти из аккаунта?')) {
+        if (window._incomeInterval) clearInterval(window._incomeInterval);
+        if (window._energyInterval) clearInterval(window._energyInterval);
+        if (window._diamondInterval) clearInterval(window._diamondInterval);
+        if (window._diamondTimerInterval) clearInterval(window._diamondTimerInterval);
+        window._incomeInterval = null;
+        window._energyInterval = null;
+        window._diamondInterval = null;
+        window._diamondTimerInterval = null;
+        currentUser = null;
+        game = null;
+        appEl.style.display = 'none';
+        authScreen.style.display = 'flex';
+        authNick.value = '';
+        authPass.value = '';
+        authError.textContent = '';
+    }
+}
+
+// ================================================================
+//  ЗАПУСК
+// ================================================================
+authScreen.style.display = 'flex';
+appEl.style.display = 'none';
+
+console.log('CryptoClicker PRO — финальная версия. Пассивный доход заменён на доход в секунду. Логин работает.');
+</script>
+</body>
+</html>

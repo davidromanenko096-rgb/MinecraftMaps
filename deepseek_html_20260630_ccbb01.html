@@ -1,0 +1,2400 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CryptoClicker PRO</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',sans-serif; user-select:none; }
+        body {
+            background: #0b0e14;
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 0;
+            margin: 0;
+            background: radial-gradient(circle at 20% 30%, #1a2a3a, #0b0e14);
+            width: 100%;
+            height: 100vh;
+            overflow: hidden;
+        }
+        #app {
+            width: 100%;
+            height: 100vh;
+            max-width: 100%;
+            background: rgba(20, 26, 36, 0.95);
+            backdrop-filter: blur(6px);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: none;
+            border-radius: 0;
+            padding-bottom: 60px;
+        }
+        /* Верхняя панель */
+        .top-nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 6px 12px;
+            background: rgba(26, 34, 46, 0.9);
+            border-bottom: 2px solid #2a3a4a;
+            flex-shrink: 0;
+        }
+        .top-nav .left, .top-nav .right { display: flex; gap: 8px; }
+        .top-nav .nav-btn {
+            background: transparent;
+            border: none;
+            color: #7a8a9e;
+            font-size: 18px;
+            cursor: pointer;
+            position: relative;
+            padding: 2px 6px;
+            border-radius: 8px;
+            transition: 0.2s;
+        }
+        .top-nav .nav-btn:hover { background: rgba(255,255,255,0.05); }
+        .top-nav .nav-btn .badge {
+            position: absolute;
+            top: -4px;
+            right: -4px;
+            background: #e74c3c;
+            color: #fff;
+            border-radius: 50%;
+            width: 14px;
+            height: 14px;
+            font-size: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            display: none;
+        }
+        .top-nav .nav-btn .badge.show { display: flex; }
+        .top-nav .title {
+            font-weight: 700;
+            font-size: 16px;
+            background: linear-gradient(45deg, #f7b731, #f5a623);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .header {
+            background: linear-gradient(135deg, #1a2a3a, #0f1a24);
+            padding: 4px 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #f7b731;
+            flex-shrink: 0;
+        }
+        .header .balance {
+            display: flex;
+            gap: 10px;
+            font-size: 12px;
+        }
+        .header .balance span {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            background: rgba(15, 21, 30, 0.7);
+            padding: 2px 8px;
+            border-radius: 16px;
+            border: 1px solid #2a3a4a;
+        }
+        .fa-coins { color: #f7b731; }
+        .fa-gem { color: #4fc3f7; }
+        .content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 12px;
+            padding-bottom: 4px;
+        }
+        .tab { display: none; animation: fadeIn 0.25s ease; }
+        .tab.active { display: block; }
+        @keyframes fadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); } }
+        /* Квесты и ежедневные (светлые) */
+        #tabQuests, #tabDaily {
+            background: #ffffff;
+            color: #000000;
+            border-radius: 12px;
+            padding: 10px;
+            margin: 0;
+        }
+        #tabQuests h3, #tabDaily h3 { color: #000; margin-bottom: 6px; font-size: 15px; }
+        .quest-item {
+            background: #f0f0f0;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-left: 3px solid #f7b731;
+        }
+        .quest-item .info { flex: 1; }
+        .quest-item .info .name { font-weight: 600; font-size: 13px; }
+        .quest-item .info .desc { font-size: 11px; color: #555; }
+        .quest-item .reward { font-weight: 700; color: #4fc3f7; font-size: 13px; }
+        .quest-item .btn-claim {
+            background: #f7b731;
+            border: none;
+            padding: 3px 10px;
+            border-radius: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #0b0e14;
+            font-size: 12px;
+        }
+        .quest-item .btn-claim:disabled { opacity: 0.4; cursor: not-allowed; }
+        .quest-item.completed { opacity: 0.6; border-left-color: #4fc3f7; }
+        .daily-reward {
+            background: #f0f0f0;
+            border-radius: 10px;
+            padding: 12px;
+            text-align: center;
+        }
+        .daily-reward .btn-claim {
+            background: #f7b731;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 24px;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            color: #0b0e14;
+        }
+        .daily-reward .btn-claim:disabled { opacity: 0.4; cursor: not-allowed; }
+        /* Инвентарь */
+        #tabInventory {
+            background: rgba(26, 34, 46, 0.6);
+            border-radius: 12px;
+            padding: 10px;
+            border: 1px solid #2a3a4a;
+        }
+        .inventory-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 21, 30, 0.5);
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin-bottom: 6px;
+            border: 1px solid #2a3a4a;
+        }
+        .inventory-item .name { font-weight: 600; font-size: 13px; }
+        .inventory-item .count { color: #4fc3f7; font-weight: 700; }
+        .inventory-item .btn-use {
+            background: #f7b731;
+            border: none;
+            padding: 2px 12px;
+            border-radius: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            color: #0b0e14;
+            font-size: 12px;
+        }
+        .inventory-item .btn-use:disabled { opacity: 0.4; cursor: not-allowed; }
+        .effect-indicator {
+            background: rgba(247, 183, 49, 0.2);
+            border: 1px solid #f7b731;
+            border-radius: 20px;
+            padding: 4px 12px;
+            font-size: 12px;
+            color: #f7b731;
+            margin: 4px 0;
+            display: inline-block;
+        }
+        /* Главный экран - увеличено, убраны промежутки */
+        .click-area { display: flex; flex-direction: column; align-items: center; width: 100%; }
+        .big-balance {
+            display: flex;
+            gap: 18px;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 2px;
+            background: rgba(15, 21, 30, 0.6);
+            padding: 4px 16px;
+            border-radius: 30px;
+            border: 1px solid #2a3a4a;
+            backdrop-filter: blur(4px);
+        }
+        .big-balance .coins { color: #f7b731; }
+        .big-balance .diamonds { color: #4fc3f7; }
+        .diamond-timer {
+            font-size: 12px;
+            color: #4fc3f7;
+            margin-bottom: 4px;
+            background: rgba(15, 21, 30, 0.6);
+            padding: 2px 12px;
+            border-radius: 20px;
+            border: 1px solid #2a3a4a;
+        }
+        /* Круг клика увеличен */
+        .click-coin {
+            width: 150px;
+            height: 150px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #f7d875, #e6a020);
+            box-shadow: 0 8px 0 #a67c1e, 0 12px 30px rgba(0,0,0,0.6);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 60px;
+            color: #fff;
+            text-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            cursor: pointer;
+            transition: transform 0.08s, box-shadow 0.08s;
+            margin-bottom: 6px;
+            position: relative;
+            transform: translateY(0);
+        }
+        .click-coin:active {
+            transform: translateY(6px);
+            box-shadow: 0 2px 0 #a67c1e, 0 8px 20px rgba(0,0,0,0.6);
+        }
+        .click-coin .fa-bolt {
+            font-size: 24px;
+            opacity: 0.2;
+            position: absolute;
+            bottom: 8px;
+            right: 8px;
+            color: #f7b731;
+        }
+        .energy-bar {
+            width: 100%;
+            background: #1e2633;
+            height: 8px;
+            border-radius: 16px;
+            margin: 4px 0 6px;
+            overflow: hidden;
+            border: 1px solid #2a3a4a;
+        }
+        .energy-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4fc3f7, #29b6f6);
+            border-radius: 16px;
+            transition: width 0.15s;
+        }
+        .energy-text {
+            display: flex;
+            justify-content: space-between;
+            font-size: 11px;
+            color: #8a9aaa;
+        }
+        /* Статистика внизу, увеличены квадраты */
+        .stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            width: 100%;
+            margin-top: 8px;
+        }
+        .stats-item {
+            background: rgba(26, 34, 46, 0.7);
+            border-radius: 12px;
+            padding: 8px 4px;
+            text-align: center;
+            border: 1px solid #2a3a4a;
+            backdrop-filter: blur(4px);
+        }
+        .stats-item .label {
+            font-size: 10px;
+            color: #8a9aaa;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .stats-item .value {
+            font-size: 18px;
+            font-weight: 700;
+            color: #f7b731;
+            margin-top: 2px;
+        }
+        .stats-item .value.blue { color: #4fc3f7; }
+        /* Магазины */
+        .shop-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .shop-card {
+            background: rgba(26, 34, 46, 0.7);
+            border-radius: 12px;
+            padding: 10px 6px;
+            text-align: center;
+            border: 1px solid #2a3a4a;
+            transition: 0.2s;
+            cursor: pointer;
+            backdrop-filter: blur(4px);
+        }
+        .shop-card:hover { border-color: #f7b731; transform: translateY(-2px); }
+        .shop-card .icon { font-size: 20px; color: #f7b731; margin-bottom: 2px; }
+        .shop-card .name { font-weight: 600; font-size: 12px; }
+        .shop-card .desc { font-size: 10px; color: #8a9aaa; margin: 2px 0 4px; }
+        .shop-card .price {
+            display: inline-block;
+            background: rgba(15, 21, 30, 0.6);
+            padding: 2px 10px;
+            border-radius: 16px;
+            font-size: 11px;
+            border: 1px solid #2a3a4a;
+            color: #f7b731;
+        }
+        .shop-card .price i { margin-right: 3px; }
+        .shop-card .level { font-size: 10px; color: #4fc3f7; margin-top: 2px; }
+        .shop-card.disabled { opacity: 0.4; pointer-events: none; }
+        .diamond-shop .shop-card .icon { color: #4fc3f7; }
+        .diamond-shop .shop-card .price { border-color: #4fc3f7; color: #4fc3f7; }
+        .brand-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 6px;
+        }
+        .brand-card {
+            background: rgba(26, 34, 46, 0.6);
+            border-radius: 10px;
+            padding: 8px 4px;
+            text-align: center;
+            border: 1px solid #2a3a4a;
+            cursor: pointer;
+            transition: 0.2s;
+            backdrop-filter: blur(4px);
+        }
+        .brand-card:hover { border-color: #4fc3f7; transform: translateY(-2px); }
+        .brand-card .icon { font-size: 26px; margin-bottom: 2px; }
+        .brand-card .name { font-weight: 600; font-size: 12px; }
+        .brand-card .level { font-size: 10px; color: #4fc3f7; margin: 2px 0; }
+        .brand-card .income { font-size: 10px; color: #aabaca; }
+        .brand-card .price { font-size: 11px; color: #f7b731; }
+        .brand-card.disabled { opacity: 0.4; pointer-events: none; }
+        /* Лидерборд */
+        .leaderboard-list { margin-top: 6px; max-height: 260px; overflow-y: auto; }
+        .leader-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 12px;
+            background: rgba(26, 34, 46, 0.6);
+            border-radius: 8px;
+            margin-bottom: 4px;
+            border-left: 3px solid #f7b731;
+            backdrop-filter: blur(4px);
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .leader-item:hover { background: rgba(26, 34, 46, 0.9); }
+        .leader-item .rank { font-weight: 700; color: #f7b731; width: 24px; font-size: 12px; }
+        .leader-item .rank.gold { color: #ffd700; }
+        .leader-item .rank.silver { color: #c0c0c0; }
+        .leader-item .rank.bronze { color: #cd7f32; }
+        .leader-item .name { flex:1; margin-left: 6px; font-size: 12px; }
+        .leader-item .name .badge-icon { margin-left: 4px; font-size: 12px; }
+        .leader-item .name .badge-icon.admin { color: #4fc3f7; }
+        .leader-item .name .badge-icon.super { color: #ffd700; }
+        .leader-item .score { font-weight: 600; font-size: 12px; }
+        /* Настройки */
+        .settings-group {
+            background: rgba(26, 34, 46, 0.6);
+            border-radius: 12px;
+            padding: 10px;
+            margin-top: 6px;
+            backdrop-filter: blur(4px);
+            border: 1px solid #2a3a4a;
+        }
+        .settings-group label {
+            display: block;
+            font-size: 11px;
+            margin-bottom: 3px;
+            color: #aabaca;
+        }
+        .settings-group input {
+            width: 100%;
+            padding: 6px 10px;
+            background: rgba(15, 21, 30, 0.6);
+            border: 1px solid #2a3a4a;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 13px;
+            outline: none;
+        }
+        .settings-group input:focus { border-color: #f7b731; }
+        .settings-group .btn {
+            margin-top: 6px;
+            background: linear-gradient(135deg, #f7b731, #f5a623);
+            color: #0b0e14;
+            border: none;
+            padding: 8px;
+            border-radius: 24px;
+            font-weight: 700;
+            font-size: 13px;
+            width: 100%;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .settings-group .btn:hover { transform: scale(1.02); }
+        .settings-group .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+        }
+        .settings-group .btn-danger:hover { background: linear-gradient(135deg, #c0392b, #e74c3c); }
+        .settings-group .btn-secondary {
+            background: rgba(42, 58, 74, 0.6);
+            color: #e0e0e0;
+        }
+        .settings-group .btn-secondary:hover { background: rgba(42, 58, 74, 0.9); }
+        /* Сообщения */
+        .msg-item {
+            background: rgba(15, 21, 30, 0.5);
+            border-radius: 8px;
+            padding: 6px 10px;
+            margin-bottom: 4px;
+            border-left: 3px solid #f7b731;
+            font-size: 12px;
+        }
+        .msg-item .msg-sender { font-weight: 600; color: #f7b731; }
+        .msg-item .msg-text { color: #e0e0e0; }
+        .msg-item .msg-time { font-size: 10px; color: #8a9aaa; float: right; }
+        /* Нижняя навигация */
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(26, 34, 46, 0.95);
+            backdrop-filter: blur(8px);
+            display: flex;
+            justify-content: space-around;
+            padding: 6px 0 10px;
+            border-top: 2px solid #2a3a4a;
+            z-index: 10;
+            overflow-x: auto;
+            flex-shrink: 0;
+            height: 60px;
+        }
+        .bottom-nav .nav-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 10px;
+            color: #7a8a9e;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 12px;
+            transition: 0.2s;
+            background: transparent;
+            border: none;
+            gap: 1px;
+            flex-shrink: 0;
+            min-width: 44px;
+        }
+        .bottom-nav .nav-item i { font-size: 18px; }
+        .bottom-nav .nav-item.active { color: #f7b731; background: rgba(15, 21, 30, 0.5); }
+        .bottom-nav .nav-item.active i { color: #f7b731; }
+        /* Модалка профиля */
+        .profile-modal {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            padding: 20px;
+        }
+        .profile-modal .modal-content {
+            background: #141a24;
+            border-radius: 20px;
+            padding: 20px;
+            max-width: 340px;
+            width: 100%;
+            border: 1px solid #2a3a4a;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        .profile-modal .modal-content h3 { color: #f7b731; margin-bottom: 10px; font-size: 16px; }
+        .profile-modal .modal-content .close-btn {
+            float: right;
+            background: none;
+            border: none;
+            color: #8a9aaa;
+            font-size: 20px;
+            cursor: pointer;
+        }
+        .profile-modal .modal-content .profile-detail {
+            margin: 4px 0;
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #2a3a4a;
+            padding: 3px 0;
+            font-size: 13px;
+        }
+        .profile-modal .modal-content .profile-detail .label { color: #8a9aaa; }
+        .profile-modal .modal-content .profile-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 8px;
+        }
+        .profile-modal .modal-content .profile-actions button {
+            background: #2a3a4a;
+            border: none;
+            color: #e0e0e0;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+        .profile-modal .modal-content .profile-actions button:hover { background: #3e4a5e; }
+        .profile-modal .modal-content .profile-actions button.danger { background: #e74c3c; color: white; }
+        .profile-modal .modal-content .profile-actions button.danger:hover { background: #c0392b; }
+        .profile-modal .modal-content .profile-actions button.primary { background: #f7b731; color: #0b0e14; }
+        .profile-modal .modal-content .profile-actions button.primary:hover { background: #f5a623; }
+        .profile-modal .modal-content .subscribe-btn {
+            background: #4fc3f7;
+            color: #0b0e14;
+            border: none;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .profile-modal .modal-content .subscribe-btn.subscribed { background: #2a3a4a; color: #8a9aaa; }
+        .profile-modal .modal-content .subscribe-btn:hover { opacity: 0.8; }
+        /* Экран входа */
+        .auth-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            padding: 20px;
+            background: radial-gradient(circle at 30% 40%, #1a2a3a, #0b0e14);
+        }
+        .auth-screen h2 {
+            color: #f7b731;
+            margin-bottom: 16px;
+            font-size: 24px;
+            text-shadow: 0 0 30px rgba(247, 183, 49, 0.3);
+        }
+        .auth-screen .step { width: 100%; max-width: 320px; }
+        .auth-screen .input-group {
+            width: 100%;
+            position: relative;
+            margin-bottom: 10px;
+        }
+        .auth-screen .input-group input {
+            width: 100%;
+            padding: 12px 12px;
+            background: rgba(15, 21, 30, 0.7);
+            border: 1px solid #2a3a4a;
+            border-radius: 12px;
+            color: #e0e0e0;
+            font-size: 15px;
+            outline: none;
+        }
+        .auth-screen .input-group input:focus { border-color: #f7b731; }
+        .auth-screen .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 12px;
+            font-weight: 700;
+            font-size: 15px;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 4px;
+        }
+        .auth-screen .btn-primary {
+            background: linear-gradient(135deg, #f7b731, #f5a623);
+            color: #0b0e14;
+        }
+        .auth-screen .btn-primary:hover { transform: scale(1.02); }
+        .auth-screen .btn-secondary {
+            background: rgba(42, 58, 74, 0.6);
+            color: #e0e0e0;
+        }
+        .auth-screen .btn-secondary:hover { background: rgba(42, 58, 74, 0.9); }
+        .auth-screen .error {
+            color: #e74c3c;
+            font-size: 13px;
+            margin-bottom: 8px;
+            min-height: 18px;
+        }
+        .auth-screen .hidden { display: none; }
+        .chest-btn {
+            background: linear-gradient(135deg, #f7b731, #f5a623);
+            border: none;
+            padding: 10px;
+            border-radius: 24px;
+            font-weight: 700;
+            font-size: 14px;
+            width: 100%;
+            cursor: pointer;
+            color: #0b0e14;
+            margin-top: 6px;
+            transition: 0.2s;
+        }
+        .chest-btn:hover { transform: scale(1.02); }
+        .chest-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+        .float-text {
+            position: fixed;
+            pointer-events: none;
+            font-size: 22px;
+            font-weight: 700;
+            color: #f7b731;
+            text-shadow: 0 0 20px rgba(247, 183, 49, 0.5);
+            animation: floatUp 0.7s ease-out forwards;
+            z-index: 100;
+        }
+        @keyframes floatUp {
+            0% { opacity:1; transform: translateY(0) scale(1); }
+            100% { opacity:0; transform: translateY(-80px) scale(1.3); }
+        }
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            50% { transform: translateX(6px); }
+            75% { transform: translateX(-3px); }
+            100% { transform: translateX(0); }
+        }
+        @media (max-width:420px) {
+            .header .balance span { font-size: 10px; padding: 2px 6px; }
+            .big-balance { font-size: 16px; gap: 12px; padding: 3px 10px; }
+            .click-coin { width: 130px; height: 130px; font-size: 48px; }
+            .shop-grid, .brand-grid { grid-template-columns: 1fr 1fr; }
+            .top-nav .title { font-size: 14px; }
+            .bottom-nav .nav-item i { font-size: 16px; }
+            .bottom-nav .nav-item { font-size: 9px; min-width: 36px; padding: 2px 4px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- ЭКРАН ВХОДА -->
+<div id="authScreen" class="auth-screen">
+    <h2>🔐 CryptoClicker</h2>
+    <div class="error" id="authError"></div>
+    <div id="authStep1" class="step">
+        <div class="input-group">
+            <input type="text" id="authNick" placeholder="Никнейм">
+        </div>
+        <button class="btn btn-primary" id="authNextBtn">Далее</button>
+    </div>
+    <div id="authStep2" class="step hidden">
+        <div class="input-group">
+            <input type="password" id="authPass" placeholder="Пароль">
+        </div>
+        <button class="btn btn-primary" id="authLoginBtn">Войти</button>
+        <button class="btn btn-secondary" id="authBackBtn">Назад</button>
+    </div>
+</div>
+
+<!-- ОСНОВНАЯ ИГРА -->
+<div id="app" style="display:none;">
+    <div class="top-nav">
+        <div class="left">
+            <button class="nav-btn" id="topQuestsBtn"><i class="fas fa-tasks"></i><span class="badge" id="questsBadgeTop">!</span></button>
+            <button class="nav-btn" id="topDailyBtn"><i class="fas fa-calendar-day"></i><span class="badge" id="dailyBadgeTop">!</span></button>
+        </div>
+        <div class="title">CryptoClicker</div>
+        <div class="right">
+            <button class="nav-btn" id="topSettingsBtn"><i class="fas fa-cog"></i></button>
+        </div>
+    </div>
+    <div class="header">
+        <div class="balance">
+            <span><i class="fas fa-coins"></i> <span id="headerCoins">0</span></span>
+            <span><i class="fas fa-gem"></i> <span id="headerDiamonds">0</span></span>
+            <span style="font-size:10px; background:transparent; border:none; padding:0;">👤 <span id="headerNick">Игрок</span></span>
+        </div>
+    </div>
+    <div class="content">
+        <!-- Главная -->
+        <div id="tabMain" class="tab active">
+            <div class="click-area">
+                <div class="big-balance">
+                    <span class="coins"><i class="fas fa-coins"></i> <span id="mainCoins">0</span></span>
+                    <span class="diamonds"><i class="fas fa-gem"></i> <span id="mainDiamonds">0</span></span>
+                </div>
+                <div id="effectIndicator" class="effect-indicator" style="display:none;">⚡ Активен эффект</div>
+                <div class="diamond-timer" id="diamondTimer">⏳ Следующий алмаз через: 10:00</div>
+                <div class="click-coin" id="clickCoin"><i class="fas fa-coins"></i><i class="fas fa-bolt"></i></div>
+                <div class="energy-bar"><div class="energy-fill" id="energyFill" style="width:100%"></div></div>
+                <div class="energy-text"><span>⚡ Энергия</span><span id="energyLabel">100 / 100</span></div>
+                <div class="stats">
+                    <div class="stats-item"><div class="label">Кликов</div><div class="value" id="statClicks">0</div></div>
+                    <div class="stats-item"><div class="label">Доход за клик</div><div class="value" id="statClickPower">1</div></div>
+                    <div class="stats-item"><div class="label">Макс. энергия</div><div class="value" id="statMaxEnergy">100</div></div>
+                    <div class="stats-item"><div class="label">Доход в сек</div><div class="value blue" id="statIncomePerSec">0</div></div>
+                </div>
+            </div>
+        </div>
+        <!-- Магазин -->
+        <div id="tabShop" class="tab"><h3 style="margin-bottom:4px;font-size:14px;color:#f7b731;"><i class="fas fa-store"></i> Магазин</h3><div class="shop-grid" id="shopGrid"></div></div>
+        <!-- Филиалы -->
+        <div id="tabBrands" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#f7b731;"><i class="fas fa-building"></i> Филиалы</h3>
+            <div class="brand-grid" id="brandGrid"></div>
+        </div>
+        <!-- Алмазный магазин -->
+        <div id="tabDiamond" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#4fc3f7;"><i class="fas fa-gem"></i> Алмазные улучшения</h3>
+            <div class="shop-grid diamond-shop" id="diamondShop"></div>
+            <div style="margin-top:8px; background:rgba(26,34,46,0.6); border-radius:12px; padding:10px; border:1px solid #2a3a4a;">
+                <h4 style="color:#4fc3f7; font-size:12px;">Ускорение алмазов</h4>
+                <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:3px; color:#aabaca;">
+                    <span>Текущий интервал: <span id="diamondIntervalDisplay" style="color:#f7b731;">10</span> мин</span>
+                </div>
+                <div class="shop-grid" style="margin-top:4px;" id="diamondSpeedShop"></div>
+            </div>
+        </div>
+        <!-- Квесты -->
+        <div id="tabQuests" class="tab">
+            <h3><i class="fas fa-tasks"></i> Задания</h3>
+            <div id="questsContainer"></div>
+        </div>
+        <!-- Ежедневные -->
+        <div id="tabDaily" class="tab">
+            <h3><i class="fas fa-calendar-day"></i> Ежедневные награды</h3>
+            <div class="daily-reward" id="dailyRewardContainer">
+                <p id="dailyStatus">Загрузка...</p>
+                <button class="btn-claim" id="dailyClaimBtn" disabled>Забрать</button>
+            </div>
+        </div>
+        <!-- Инвентарь -->
+        <div id="tabInventory" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#4fc3f7;"><i class="fas fa-box"></i> Инвентарь</h3>
+            <div id="inventoryContainer"></div>
+        </div>
+        <!-- Сундук -->
+        <div id="tabChest" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#f7b731;"><i class="fas fa-box"></i> Сундуки</h3>
+            <div style="background:rgba(26,34,46,0.6); border-radius:12px; padding:12px; margin-top:4px; border:1px solid #2a3a4a; text-align:center;">
+                <p style="font-size:12px; color:#aabaca;">Открой сундук за 10 💎 и получи от 2000 до 20000 монет!</p>
+                <button class="chest-btn" id="openChestBtn">🎁 Открыть (10 💎)</button>
+                <div id="chestResult" style="margin-top:8px; font-size:16px; font-weight:700; color:#f7b731;"></div>
+            </div>
+        </div>
+        <!-- Лидеры -->
+        <div id="tabLeaders" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#f7b731;"><i class="fas fa-trophy"></i> Таблица лидеров</h3>
+            <div style="font-size:11px; color:#8a9aaa; margin-bottom:6px;">
+                Обновление через: <span id="leaderboardTimer">23:59:59</span>
+            </div>
+            <div class="leaderboard-list" id="leaderList"></div>
+        </div>
+        <!-- Профиль -->
+        <div id="tabProfile" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#4fc3f7;"><i class="fas fa-user"></i> Профиль</h3>
+            <div class="profile-grid">
+                <div class="profile-item"><div class="label">Игрок</div><div class="value" id="profileNick">-</div></div>
+                <div class="profile-item"><div class="label">Зарегистрирован</div><div class="value" id="profileRegistered">-</div></div>
+                <div class="profile-item"><div class="label">Кликов</div><div class="value" id="profileClicks">0</div></div>
+                <div class="profile-item"><div class="label">Открыто сундуков</div><div class="value" id="profileChests">0</div></div>
+                <div class="profile-item" style="grid-column:span 2;"><div class="label">Время в игре</div><div class="value" id="profileTime">0 мин</div></div>
+                <div class="profile-item" style="grid-column:span 2;"><div class="label">Выполнено квестов</div><div class="value" id="profileQuests">0</div></div>
+                <div class="profile-item" style="grid-column:span 2;"><div class="label">Зелий в инвентаре</div><div class="value" id="profilePotions">0</div></div>
+                <div class="profile-item" style="grid-column:span 2;"><div class="label">Подписчики</div><div class="value" id="profileFollowers">0</div></div>
+            </div>
+        </div>
+        <!-- Настройки -->
+        <div id="tabSettings" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#f7b731;"><i class="fas fa-cog"></i> Настройки</h3>
+            <div class="settings-group">
+                <label>Ваш ник: <strong id="settingsNick" style="color:#f7b731;">Игрок</strong></label>
+                <button class="btn btn-danger" id="logoutBtn">Выйти из аккаунта</button>
+            </div>
+            <div class="settings-group">
+                <label>Введите код</label>
+                <input type="text" id="codeInput" placeholder="Код">
+                <button class="btn" id="codeApplyBtn">Применить</button>
+                <div id="codeMessage" style="margin-top:4px; font-size:12px; color:#aabaca;"></div>
+            </div>
+            <div class="settings-group">
+                <label>Сообщения</label>
+                <textarea id="msgInput" placeholder="Напишите сообщение администратору..." style="width:100%; padding:6px; background:rgba(15,21,30,0.6); border:1px solid #2a3a4a; border-radius:8px; color:#e0e0e0; font-size:13px; resize:vertical; min-height:60px;"></textarea>
+                <button class="btn btn-secondary" id="sendMsgBtn">Отправить</button>
+                <div id="msgList" style="margin-top:6px; max-height:150px; overflow-y:auto;"></div>
+            </div>
+        </div>
+    </div>
+    <!-- Нижняя навигация -->
+    <div class="bottom-nav">
+        <button class="nav-item active" data-tab="tabMain"><i class="fas fa-home"></i> Главная</button>
+        <button class="nav-item" data-tab="tabShop"><i class="fas fa-store"></i> Магазин</button>
+        <button class="nav-item" data-tab="tabBrands"><i class="fas fa-building"></i> Бизнес</button>
+        <button class="nav-item" data-tab="tabDiamond"><i class="fas fa-gem"></i> Алмазы</button>
+        <button class="nav-item" data-tab="tabInventory"><i class="fas fa-box"></i> Инвентарь</button>
+        <button class="nav-item" data-tab="tabChest"><i class="fas fa-box"></i> Сундук</button>
+        <button class="nav-item" data-tab="tabLeaders"><i class="fas fa-trophy"></i> Лидеры</button>
+        <button class="nav-item" data-tab="tabProfile"><i class="fas fa-user"></i> Профиль</button>
+    </div>
+</div>
+
+<!-- Модалка профиля -->
+<div id="profileModal" class="profile-modal" style="display:none;">
+    <div class="modal-content">
+        <button class="close-btn" id="profileModalClose">&times;</button>
+        <h3 id="profileModalTitle">Профиль</h3>
+        <div id="profileModalContent"></div>
+        <div id="profileModalActions" class="profile-actions"></div>
+    </div>
+</div>
+
+<script>
+// ================================================================
+//  ПОДКЛЮЧЕНИЕ К FIREBASE
+// ================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyF53aFyEX-od8kbmNHzBTNwtpMFKdPLs",
+  authDomain: "crypto-clicker-game-d952e.firebaseapp.com",
+  databaseURL: "https://crypto-clicker-game-d952e-default-rtdb.firebaseio.com",
+  projectId: "crypto-clicker-game-d952e",
+  storageBucket: "crypto-clicker-game-d952e.firebasestorageapi",
+  messagingSenderId: "1034077574733",
+  appId: "1:1034077574733:web:c09493fcb59f72bd2c6e04",
+  measurementId: "G-0Z3ZRDQ0PD"
+};
+
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// ================================================================
+//  ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+// ================================================================
+let currentUser = null;
+let game = null;
+let leaderboardCache = null;
+let leaderboardCacheTime = 0;
+let dailyClaimed = false;
+let activeEffect = null;
+let autoClickerIntervalId = null;
+let allUsersCache = {};
+
+// ================================================================
+//  АВТОРИЗАЦИЯ
+// ================================================================
+const authScreen = document.getElementById('authScreen');
+const appEl = document.getElementById('app');
+const authError = document.getElementById('authError');
+const authNick = document.getElementById('authNick');
+const authPass = document.getElementById('authPass');
+const authNextBtn = document.getElementById('authNextBtn');
+const authLoginBtn = document.getElementById('authLoginBtn');
+const authBackBtn = document.getElementById('authBackBtn');
+const authStep1 = document.getElementById('authStep1');
+const authStep2 = document.getElementById('authStep2');
+let currentNick = '';
+
+authNextBtn.addEventListener('click', () => {
+    const nick = authNick.value.trim();
+    if (nick.length < 3) { authError.textContent = 'Ник минимум 3 символа'; return; }
+    currentNick = nick;
+    authError.textContent = '';
+    authStep1.classList.add('hidden');
+    authStep2.classList.remove('hidden');
+    authPass.value = '';
+    authPass.focus();
+});
+
+authBackBtn.addEventListener('click', () => {
+    authStep2.classList.add('hidden');
+    authStep1.classList.remove('hidden');
+});
+
+authLoginBtn.addEventListener('click', async () => {
+    const pass = authPass.value.trim();
+    if (!pass) { authError.textContent = 'Введите пароль'; return; }
+    const data = await loadUserData(currentNick);
+    if (!data) {
+        const newGame = getDefaultGame();
+        await saveUserData(currentNick, { password: pass, game: newGame, admin: false, superadmin: false, followers: [], following: [], messages: [] });
+        currentUser = currentNick;
+        game = newGame;
+        authError.textContent = '';
+        enterGame();
+        return;
+    }
+    if (data.password === pass) {
+        authError.textContent = '';
+        currentUser = currentNick;
+        game = data.game || getDefaultGame();
+        if (!game.brands) game.brands = getDefaultGame().brands;
+        if (!game.inventory) game.inventory = { potions: [] };
+        if (!game.questProgress) game.questProgress = { clicks: 0, coins: 0, brands: 0, brands_level: 0 };
+        enterGame();
+    } else {
+        authError.textContent = 'Неверный пароль';
+    }
+});
+
+// ================================================================
+//  ФУНКЦИИ РАБОТЫ С FIREBASE
+// ================================================================
+function loadUserData(nick) {
+    return new Promise((resolve) => {
+        database.ref('users/' + nick).once('value', snapshot => {
+            resolve(snapshot.val());
+        });
+    });
+}
+
+function saveUserData(nick, data) {
+    database.ref('users/' + nick).set(data);
+}
+
+function loadAllUsers() {
+    return new Promise((resolve) => {
+        database.ref('users').once('value', snapshot => {
+            const val = snapshot.val() || {};
+            allUsersCache = val;
+            resolve(val);
+        });
+    });
+}
+
+function clearAllUsers() {
+    return new Promise((resolve) => {
+        database.ref('users').set({}, resolve);
+    });
+}
+
+// ================================================================
+//  ИГРОВЫЕ ФУНКЦИИ
+// ================================================================
+function getDefaultGame() {
+    return {
+        coins: 0,
+        clickPower: 1,
+        energy: 100,
+        maxEnergy: 100,
+        diamonds: 0,
+        totalClicks: 0,
+        incomeLevel: 0,
+        incomeBonus: 0,
+        diamondAutoLevel: 0,
+        diamondIncomeLevel: 0,
+        diamondSpeedLevel: 0,
+        regenLevel: 0,
+        lastDiamondTime: Date.now(),
+        chestOpened: 0,
+        registeredAt: Date.now(),
+        dailyClaimDate: '',
+        inventory: { potions: [] },
+        questProgress: { clicks: 0, coins: 0, brands: 0, brands_level: 0 },
+        brands: {
+            cola: { level: 0, income: 0 },
+            fanta: { level: 0, income: 0 },
+            lipton: { level: 0, income: 0 },
+            pepsi: { level: 0, income: 0 },
+            sprite: { level: 0, income: 0 },
+            chips: { level: 0, income: 0 },
+            banana: { level: 0, income: 0 }
+        }
+    };
+}
+
+function enterGame() {
+    authScreen.style.display = 'none';
+    appEl.style.display = 'flex';
+    appEl.style.flexDirection = 'column';
+    document.getElementById('headerNick').textContent = currentUser;
+    document.getElementById('settingsNick').textContent = currentUser;
+    updateProfile();
+    initGame();
+}
+
+function saveGame() {
+    if (!currentUser) return;
+    loadUserData(currentUser).then(data => {
+        const pass = data ? data.password : '****';
+        const admin = data ? data.admin : false;
+        const superadmin = data ? data.superadmin : false;
+        const followers = data ? data.followers || [] : [];
+        const following = data ? data.following || [] : [];
+        const messages = data ? data.messages || [] : [];
+        saveUserData(currentUser, { password: pass, game: game, admin: admin, superadmin: superadmin, followers: followers, following: following, messages: messages });
+    });
+}
+
+function initGame() {
+    const def = getDefaultGame();
+    for (let key in def) {
+        if (!(key in game)) game[key] = def[key];
+    }
+    if (!game.brands) game.brands = def.brands;
+    for (let b in def.brands) {
+        if (!game.brands[b]) game.brands[b] = { level: 0, income: 0 };
+    }
+    if (!game.inventory) game.inventory = { potions: [] };
+    if (!game.questProgress) game.questProgress = { clicks: 0, coins: 0, brands: 0, brands_level: 0 };
+    updateBrandIncomes();
+    saveGame();
+    updateUI();
+
+    // Интервалы
+    if (!window._incomeInterval) {
+        window._incomeInterval = setInterval(() => {
+            let totalIncome = (game.incomeLevel * 10) + (game.incomeBonus || 0);
+            for (let b in game.brands) {
+                totalIncome += game.brands[b].income || 0;
+            }
+            if (totalIncome > 0) {
+                game.coins += totalIncome;
+                saveGame();
+                updateUI();
+            }
+        }, 1000);
+    }
+    if (!window._energyInterval) {
+        window._energyInterval = setInterval(() => {
+            const regen = getRegenPerSecond() / 10;
+            if (game.energy < game.maxEnergy) {
+                game.energy = Math.min(game.maxEnergy, game.energy + regen);
+                saveGame();
+                updateUI();
+            }
+        }, 100);
+    }
+    if (!window._diamondInterval) {
+        window._diamondInterval = setInterval(() => {
+            const now = Date.now();
+            const interval = getDiamondInterval() * 60 * 1000;
+            const diff = now - (game.lastDiamondTime || now);
+            if (diff >= interval) {
+                game.diamonds += 1;
+                game.lastDiamondTime = now;
+                saveGame();
+                updateUI();
+                spawnFloatText('💎 +1', { clientX: window.innerWidth-50, clientY: 50 });
+            }
+        }, 10000);
+    }
+    if (!window._diamondTimerInterval) {
+        window._diamondTimerInterval = setInterval(() => {
+            updateDiamondTimer();
+        }, 1000);
+    }
+    if (!window._leaderboardTimer) {
+        window._leaderboardTimer = setInterval(() => {
+            updateLeaderboardTimer();
+        }, 1000);
+    }
+    // Проверка квестов и ежедневных
+    checkQuests();
+    checkDailyReward();
+
+    // Обработчики
+    document.getElementById('clickCoin').addEventListener('click', function(e) {
+        clickCoin(e);
+    });
+    document.querySelectorAll('.bottom-nav .nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+            this.classList.add('active');
+            const tabId = this.dataset.tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            if (tabId === 'tabQuests') renderQuests();
+            if (tabId === 'tabDaily') renderDaily();
+            if (tabId === 'tabLeaders') renderLeaderboard();
+            if (tabId === 'tabInventory') renderInventory();
+        });
+    });
+    document.getElementById('topQuestsBtn').addEventListener('click', function() {
+        document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('tabQuests').classList.add('active');
+        renderQuests();
+    });
+    document.getElementById('topDailyBtn').addEventListener('click', function() {
+        document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('tabDaily').classList.add('active');
+        renderDaily();
+    });
+    document.getElementById('topSettingsBtn').addEventListener('click', function() {
+        document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('tabSettings').classList.add('active');
+        loadMessages();
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    document.getElementById('openChestBtn').addEventListener('click', openChest);
+    document.getElementById('codeApplyBtn').addEventListener('click', applyCode);
+    document.getElementById('sendMsgBtn').addEventListener('click', sendMessage);
+}
+
+// ================================================================
+//  ФИЛИАЛЫ (все 7 брендов)
+// ================================================================
+function updateBrandIncomes() {
+    const brands = game.brands;
+    // Coca-Cola
+    const colaLevel = brands.cola.level || 0;
+    brands.cola.income = [0, 300, 380, 490, 620, 780][colaLevel] || 0;
+    // Fanta
+    const fantaLevel = brands.fanta.level || 0;
+    brands.fanta.income = [0, 599, 700, 800, 900, 950][fantaLevel] || 0;
+    // Lipton
+    const liptonLevel = brands.lipton.level || 0;
+    brands.lipton.income = [0, 200, 250, 300, 380, 468][liptonLevel] || 0;
+    // Pepsi
+    const pepsiLevel = brands.pepsi.level || 0;
+    brands.pepsi.income = [0, 50, 80, 120, 180, 260][pepsiLevel] || 0;
+    // Sprite
+    const spriteLevel = brands.sprite.level || 0;
+    brands.sprite.income = [0, 400, 550, 750, 950, 1200][spriteLevel] || 0;
+    // Chips
+    const chipsLevel = brands.chips.level || 0;
+    brands.chips.income = [0, 100, 130, 170, 200, 220][chipsLevel] || 0;
+    // Banana
+    const bananaLevel = brands.banana.level || 0;
+    brands.banana.income = [0, 50, 80, 120, 180, 280][bananaLevel] || 0;
+}
+
+function getBrandPrice(brandKey) {
+    const level = game.brands[brandKey].level || 0;
+    if (level >= 5) return Infinity;
+    const basePrices = {
+        cola: 13000,
+        fanta: 80000,
+        lipton: 45000,
+        pepsi: 5000,
+        sprite: 100000,
+        chips: 20000,
+        banana: 40000
+    };
+    return Math.floor(basePrices[brandKey] * Math.pow(1.15, level));
+}
+
+function buyBrand(brandKey) {
+    const price = getBrandPrice(brandKey);
+    if (game.coins >= price && game.brands[brandKey].level < 5) {
+        game.coins -= price;
+        game.brands[brandKey].level = (game.brands[brandKey].level || 0) + 1;
+        updateBrandIncomes();
+        playPurchaseSound();
+        updateUI();
+    }
+}
+
+function renderBrands() {
+    const container = document.getElementById('brandGrid');
+    container.innerHTML = '';
+    const brandData = {
+        cola: { name: 'Coca-Cola', icon: '🥤' },
+        fanta: { name: 'Fanta', icon: '🍊' },
+        lipton: { name: 'Lipton', icon: '🍵' },
+        pepsi: { name: 'Pepsi', icon: '🥤' },
+        sprite: { name: 'Sprite', icon: '🥤' },
+        chips: { name: 'Чипсы', icon: '🍟' },
+        banana: { name: 'Бананы', icon: '🍌' }
+    };
+    for (let key in brandData) {
+        const data = brandData[key];
+        const level = game.brands[key].level || 0;
+        const income = game.brands[key].income || 0;
+        const price = getBrandPrice(key);
+        const canBuy = game.coins >= price && level < 5;
+        const div = document.createElement('div');
+        div.className = 'brand-card' + (canBuy ? '' : ' disabled');
+        div.innerHTML = `
+            <div class="icon">${data.icon}</div>
+            <div class="name">${data.name}</div>
+            <div class="level">Уровень ${level}/5</div>
+            <div class="income">💰 ${formatNumber(income)}/сек</div>
+            <div class="price">🪙 ${formatNumber(price)}</div>
+        `;
+        if (canBuy) div.addEventListener('click', () => buyBrand(key));
+        container.appendChild(div);
+    }
+}
+
+// ================================================================
+//  КВЕСТЫ (цепочки)
+// ================================================================
+const questChains = {
+    clicks: {
+        name: 'Клики',
+        icon: '🖱️',
+        quests: [
+            { target: 100, reward: 1 },
+            { target: 250, reward: 1 },
+            { target: 500, reward: 2 },
+            { target: 1000, reward: 2 },
+            { target: 2000, reward: 3 },
+            { target: 5000, reward: 3 },
+            { target: 10000, reward: 5 },
+            { target: 50000, reward: 10 },
+            { target: 100000, reward: 15 },
+            { target: 500000, reward: 20 },
+            { target: 1000000, reward: 30 }
+        ]
+    },
+    coins: {
+        name: 'Монеты',
+        icon: '🪙',
+        quests: [
+            { target: 1000, reward: 1 },
+            { target: 5000, reward: 2 },
+            { target: 10000, reward: 3 },
+            { target: 50000, reward: 5 },
+            { target: 100000, reward: 8 },
+            { target: 500000, reward: 12 },
+            { target: 1000000, reward: 20 }
+        ]
+    },
+    brands: {
+        name: 'Купить филиалы',
+        icon: '🏢',
+        quests: [
+            { target: 1, reward: 10 },
+            { target: 2, reward: 15 },
+            { target: 3, reward: 20 },
+            { target: 4, reward: 25 },
+            { target: 5, reward: 30 },
+            { target: 6, reward: 35 },
+            { target: 7, reward: 40 }
+        ]
+    },
+    brands_level: {
+        name: 'Прокачка филиалов (уровни)',
+        icon: '📈',
+        quests: [
+            { target: 2, reward: 20, desc: 'Все филиалы на 2 уровне' },
+            { target: 3, reward: 25, desc: 'Все филиалы на 3 уровне' },
+            { target: 4, reward: 30, desc: 'Все филиалы на 4 уровне' },
+            { target: 5, reward: 40, desc: 'Все филиалы на 5 уровне' }
+        ]
+    }
+};
+
+function checkQuests() {
+    let anyAvailable = false;
+    for (let chain in questChains) {
+        const progress = game.questProgress[chain] || 0;
+        const chainData = questChains[chain];
+        if (progress < chainData.quests.length) {
+            const quest = chainData.quests[progress];
+            let currentValue = 0;
+            if (chain === 'clicks') currentValue = game.totalClicks || 0;
+            else if (chain === 'coins') currentValue = game.coins || 0;
+            else if (chain === 'brands') {
+                let count = 0;
+                for (let b in game.brands) {
+                    if ((game.brands[b].level || 0) > 0) count++;
+                }
+                currentValue = count;
+            } else if (chain === 'brands_level') {
+                let minLevel = 99;
+                for (let b in game.brands) {
+                    const lvl = game.brands[b].level || 0;
+                    if (lvl < minLevel) minLevel = lvl;
+                }
+                currentValue = minLevel;
+            }
+            if (currentValue >= quest.target) anyAvailable = true;
+        }
+    }
+    const badge = document.getElementById('questsBadgeTop');
+    if (anyAvailable) badge.classList.add('show');
+    else badge.classList.remove('show');
+}
+
+function renderQuests() {
+    const container = document.getElementById('questsContainer');
+    container.innerHTML = '';
+    let hasAvailable = false;
+
+    for (let chain in questChains) {
+        const chainData = questChains[chain];
+        const progress = game.questProgress[chain] || 0;
+        if (progress >= chainData.quests.length) {
+            const div = document.createElement('div');
+            div.className = 'quest-item completed';
+            div.innerHTML = `
+                <div class="info">
+                    <div class="name">${chainData.icon} ${chainData.name}</div>
+                    <div class="desc">✅ Все задания выполнены!</div>
+                </div>
+                <div class="reward">🏆</div>
+            `;
+            container.appendChild(div);
+            continue;
+        }
+        const quest = chainData.quests[progress];
+        let currentValue = 0;
+        let target = quest.target;
+        let desc = quest.desc || '';
+        if (chain === 'clicks') {
+            currentValue = game.totalClicks || 0;
+            desc = `Клики: ${formatNumber(currentValue)} / ${formatNumber(target)}`;
+        } else if (chain === 'coins') {
+            currentValue = game.coins || 0;
+            desc = `Монеты: ${formatNumber(currentValue)} / ${formatNumber(target)}`;
+        } else if (chain === 'brands') {
+            let count = 0;
+            for (let b in game.brands) {
+                if ((game.brands[b].level || 0) > 0) count++;
+            }
+            currentValue = count;
+            desc = `Куплено филиалов: ${currentValue} / ${target}`;
+        } else if (chain === 'brands_level') {
+            let minLevel = 99;
+            for (let b in game.brands) {
+                const lvl = game.brands[b].level || 0;
+                if (lvl < minLevel) minLevel = lvl;
+            }
+            currentValue = minLevel;
+            desc = `Все филиалы минимум ${target} уровня (сейчас ${minLevel})`;
+        }
+        const completed = currentValue >= target;
+        if (completed) hasAvailable = true;
+
+        const div = document.createElement('div');
+        div.className = 'quest-item' + (completed ? '' : '');
+        div.innerHTML = `
+            <div class="info">
+                <div class="name">${chainData.icon} ${chainData.name}</div>
+                <div class="desc">${desc}</div>
+            </div>
+            <div class="reward">💎 +${quest.reward}</div>
+            ${completed ? `<button class="btn-claim" data-chain="${chain}">Забрать</button>` : `<button class="btn-claim" disabled>Не выполнено</button>`}
+        `;
+        container.appendChild(div);
+    }
+
+    container.querySelectorAll('.btn-claim[data-chain]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const chain = this.dataset.chain;
+            const idx = game.questProgress[chain] || 0;
+            const chainData2 = questChains[chain];
+            if (idx >= chainData2.quests.length) return;
+            const quest2 = chainData2.quests[idx];
+            let currentValue2 = 0;
+            if (chain === 'clicks') currentValue2 = game.totalClicks || 0;
+            else if (chain === 'coins') currentValue2 = game.coins || 0;
+            else if (chain === 'brands') {
+                let count = 0;
+                for (let b in game.brands) {
+                    if ((game.brands[b].level || 0) > 0) count++;
+                }
+                currentValue2 = count;
+            } else if (chain === 'brands_level') {
+                let minLevel = 99;
+                for (let b in game.brands) {
+                    const lvl = game.brands[b].level || 0;
+                    if (lvl < minLevel) minLevel = lvl;
+                }
+                currentValue2 = minLevel;
+            }
+            if (currentValue2 >= quest2.target) {
+                game.diamonds += quest2.reward;
+                game.questProgress[chain] = (game.questProgress[chain] || 0) + 1;
+                saveGame();
+                updateUI();
+                renderQuests();
+                playPurchaseSound();
+                spawnFloatText('✅ Награда получена!', { clientX: window.innerWidth/2, clientY: 100 });
+                checkQuests();
+            }
+        });
+    });
+
+    const badge = document.getElementById('questsBadgeTop');
+    if (hasAvailable) badge.classList.add('show');
+    else badge.classList.remove('show');
+}
+
+// ================================================================
+//  ЕЖЕДНЕВНЫЕ НАГРАДЫ
+// ================================================================
+const dailyRewards = [
+    { day: 1, reward: '10 💎', diamonds: 10 },
+    { day: 2, reward: '22k монет', coins: 22000 },
+    { day: 3, reward: '20 💎', diamonds: 20 },
+    { day: 4, reward: '33k монет', coins: 33000 },
+    { day: 5, reward: '15 💎', diamonds: 15 },
+    { day: 6, reward: '40k монет', coins: 40000 },
+    { day: 7, reward: '25 💎', diamonds: 25 },
+    { day: 8, reward: '50k монет', coins: 50000 },
+    { day: 9, reward: '30 💎', diamonds: 30 },
+    { day: 10, reward: '60k монет', coins: 60000 }
+];
+
+function checkDailyReward() {
+    const today = new Date().toISOString().slice(0,10);
+    if (game.dailyClaimDate !== today) {
+        dailyClaimed = false;
+        document.getElementById('dailyBadgeTop').classList.add('show');
+    } else {
+        dailyClaimed = true;
+        document.getElementById('dailyBadgeTop').classList.remove('show');
+    }
+}
+
+function renderDaily() {
+    const container = document.getElementById('dailyRewardContainer');
+    const today = new Date().toISOString().slice(0,10);
+    const canClaim = !dailyClaimed && game.dailyClaimDate !== today;
+    const dayIndex = (game.dailyClaimDate && game.dailyClaimDate !== today) ?
+        (dailyRewards.findIndex(r => r.day === (game.dailyDay || 0)) + 1) % dailyRewards.length : 0;
+    const reward = dailyRewards[dayIndex] || dailyRewards[0];
+    let statusText = '';
+    if (canClaim) {
+        statusText = `🎁 Сегодня вы можете получить: ${reward.reward}`;
+        document.getElementById('dailyClaimBtn').disabled = false;
+    } else if (dailyClaimed) {
+        statusText = '✅ Вы уже получили сегодняшнюю награду. Возвращайтесь завтра!';
+        document.getElementById('dailyClaimBtn').disabled = true;
+    } else {
+        statusText = '⏳ Награда будет доступна завтра.';
+        document.getElementById('dailyClaimBtn').disabled = true;
+    }
+    container.innerHTML = `
+        <p id="dailyStatus">${statusText}</p>
+        <button class="btn-claim" id="dailyClaimBtn" ${canClaim ? '' : 'disabled'}>Забрать</button>
+    `;
+    document.getElementById('dailyClaimBtn').addEventListener('click', function() {
+        if (!canClaim) return;
+        const dayIndex2 = (game.dailyClaimDate && game.dailyClaimDate !== today) ?
+            (dailyRewards.findIndex(r => r.day === (game.dailyDay || 0)) + 1) % dailyRewards.length : 0;
+        const reward2 = dailyRewards[dayIndex2] || dailyRewards[0];
+        if (reward2.diamonds) game.diamonds += reward2.diamonds;
+        if (reward2.coins) game.coins += reward2.coins;
+        game.dailyClaimDate = today;
+        game.dailyDay = reward2.day;
+        dailyClaimed = true;
+        saveGame();
+        updateUI();
+        renderDaily();
+        document.getElementById('dailyBadgeTop').classList.remove('show');
+        playPurchaseSound();
+        spawnFloatText('🎉 Награда получена!', { clientX: window.innerWidth/2, clientY: 100 });
+    });
+}
+
+// ================================================================
+//  ИНВЕНТАРЬ И ЗЕЛЬЯ
+// ================================================================
+function addPotion(potionId) {
+    if (!game.inventory) game.inventory = { potions: [] };
+    let found = false;
+    for (let p of game.inventory.potions) {
+        if (p.id === potionId) {
+            p.count = (p.count || 0) + 1;
+            found = true;
+            break;
+        }
+    }
+    if (!found) {
+        game.inventory.potions.push({ id: potionId, count: 1 });
+    }
+    saveGame();
+    updateUI();
+    renderInventory();
+}
+
+function usePotion(potionId) {
+    let potion = null;
+    for (let p of game.inventory.potions) {
+        if (p.id === potionId && p.count > 0) {
+            potion = p;
+            break;
+        }
+    }
+    if (!potion) return;
+
+    potion.count--;
+    if (potion.count === 0) {
+        game.inventory.potions = game.inventory.potions.filter(p => p.id !== potionId);
+    }
+    saveGame();
+
+    const now = Date.now();
+    let duration = 0;
+    let type = '';
+    switch (potionId) {
+        case 'infinite_clicks':
+            type = 'infinite_clicks';
+            duration = 60000;
+            document.getElementById('effectIndicator').textContent = '⚡ Бесконечный клик (1 мин)';
+            break;
+        case 'auto_clicker':
+            type = 'auto_clicker';
+            duration = 20000;
+            document.getElementById('effectIndicator').textContent = '🤖 Автокликер (20 сек)';
+            if (autoClickerIntervalId) clearInterval(autoClickerIntervalId);
+            autoClickerIntervalId = setInterval(() => {
+                if (activeEffect && activeEffect.type === 'auto_clicker') {
+                    game.coins += game.clickPower;
+                    game.totalClicks += 1;
+                    saveGame();
+                    updateUI();
+                    spawnFloatText('+' + formatNumber(game.clickPower), { clientX: window.innerWidth/2, clientY: 50 });
+                } else {
+                    clearInterval(autoClickerIntervalId);
+                    autoClickerIntervalId = null;
+                }
+            }, 100);
+            break;
+        case 'double_income':
+            type = 'double_income';
+            duration = 30000;
+            document.getElementById('effectIndicator').textContent = '📈 Удвоение дохода (30 сек)';
+            break;
+        case 'infinite_energy':
+            type = 'infinite_energy';
+            duration = 60000;
+            document.getElementById('effectIndicator').textContent = '♾️ Бесконечная энергия (1 мин)';
+            break;
+        default:
+            return;
+    }
+    if (activeEffect) {
+        if (activeEffect.type === 'auto_clicker' && autoClickerIntervalId) {
+            clearInterval(autoClickerIntervalId);
+            autoClickerIntervalId = null;
+        }
+        activeEffect = null;
+    }
+    activeEffect = { type, endTime: now + duration, intervalId: autoClickerIntervalId };
+    document.getElementById('effectIndicator').style.display = 'inline-block';
+    setTimeout(() => {
+        if (activeEffect && activeEffect.endTime <= Date.now()) {
+            if (activeEffect.type === 'auto_clicker' && autoClickerIntervalId) {
+                clearInterval(autoClickerIntervalId);
+                autoClickerIntervalId = null;
+            }
+            activeEffect = null;
+            document.getElementById('effectIndicator').style.display = 'none';
+            updateUI();
+        }
+    }, duration);
+
+    updateUI();
+    renderInventory();
+    playPurchaseSound();
+}
+
+function renderInventory() {
+    const container = document.getElementById('inventoryContainer');
+    container.innerHTML = '';
+    if (!game.inventory || game.inventory.potions.length === 0) {
+        container.innerHTML = '<p style="color:#7a8a9e; text-align:center; font-size:13px;">Инвентарь пуст</p>';
+        return;
+    }
+    const potionNames = {
+        infinite_clicks: 'Бесконечный клик (1 мин)',
+        auto_clicker: 'Автокликер (20 сек)',
+        double_income: 'Удвоение дохода (30 сек)',
+        infinite_energy: 'Бесконечная энергия (1 мин)'
+    };
+    for (let p of game.inventory.potions) {
+        if (p.count <= 0) continue;
+        const div = document.createElement('div');
+        div.className = 'inventory-item';
+        div.innerHTML = `
+            <span class="name">${potionNames[p.id] || p.id}</span>
+            <span class="count">×${p.count}</span>
+            <button class="btn-use" data-id="${p.id}">Использовать</button>
+        `;
+        container.appendChild(div);
+    }
+    container.querySelectorAll('.btn-use').forEach(btn => {
+        btn.addEventListener('click', function() {
+            usePotion(this.dataset.id);
+        });
+    });
+}
+
+// ================================================================
+//  КОДЫ
+// ================================================================
+function applyCode() {
+    const code = document.getElementById('codeInput').value.trim();
+    const msg = document.getElementById('codeMessage');
+    if (!code) { msg.textContent = 'Введите код'; return; }
+
+    if (code === '0000') { addPotion('infinite_clicks'); msg.textContent = '✅ Получено зелье "Бесконечный клик"!'; }
+    else if (code === '0100') { addPotion('auto_clicker'); msg.textContent = '✅ Получено зелье "Автокликер"!'; }
+    else if (code === '0200') { addPotion('double_income'); msg.textContent = '✅ Получено зелье "Удвоение дохода"!'; }
+    else if (code === '1111') { addPotion('infinite_energy'); msg.textContent = '✅ Получено зелье "Бесконечная энергия"!'; }
+    else if (code === '000000') {
+        loadUserData(currentUser).then(data => {
+            if (data) {
+                data.admin = true;
+                saveUserData(currentUser, data);
+                msg.textContent = '✅ Вы стали администратором (синяя галочка)!';
+                updateUI();
+            }
+        });
+    }
+    else if (code === '611') {
+        loadUserData(currentUser).then(data => {
+            if (data) {
+                data.superadmin = true;
+                data.admin = true;
+                saveUserData(currentUser, data);
+                msg.textContent = '✅ Вы стали суперадмином (золотая галочка)!';
+                updateUI();
+            }
+        });
+    }
+    else {
+        msg.textContent = '❌ Неверный код';
+        return;
+    }
+    document.getElementById('codeInput').value = '';
+    setTimeout(() => { msg.textContent = ''; }, 3000);
+    playPurchaseSound();
+}
+
+// ================================================================
+//  ОБНОВЛЕНИЕ UI
+// ================================================================
+function updateUI() {
+    if (!game) return;
+    const coinsStr = formatNumber(game.coins);
+    const diaStr = formatNumber(game.diamonds);
+    document.getElementById('headerCoins').textContent = coinsStr;
+    document.getElementById('headerDiamonds').textContent = diaStr;
+    document.getElementById('mainCoins').textContent = coinsStr;
+    document.getElementById('mainDiamonds').textContent = diaStr;
+    const pct = (game.energy / game.maxEnergy) * 100;
+    document.getElementById('energyFill').style.width = pct + '%';
+    document.getElementById('energyLabel').textContent = Math.floor(game.energy) + ' / ' + game.maxEnergy;
+    document.getElementById('statClicks').textContent = formatNumber(game.totalClicks);
+    document.getElementById('statClickPower').textContent = formatNumber(game.clickPower);
+    document.getElementById('statMaxEnergy').textContent = game.maxEnergy;
+    let totalIncome = (game.incomeLevel * 10) + (game.incomeBonus || 0);
+    for (let b in game.brands) {
+        totalIncome += game.brands[b].income || 0;
+    }
+    document.getElementById('statIncomePerSec').textContent = formatNumber(totalIncome);
+    renderShop();
+    renderBrands();
+    renderDiamondShop();
+    renderDiamondSpeedShop();
+    renderLeaderboard();
+    updateProfile();
+    document.getElementById('adminCoins').value = 0;
+    document.getElementById('adminDiamonds').value = 0;
+    document.getElementById('adminClickPower').value = game.clickPower;
+    document.getElementById('adminMaxEnergy').value = game.maxEnergy;
+    document.getElementById('clickCoin').style.opacity = game.energy >= 1 ? '1' : '0.6';
+    updateDiamondTimer();
+    checkQuests();
+    checkDailyReward();
+    renderInventory();
+    saveGame();
+}
+
+function formatNumber(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return Math.floor(n).toString();
+}
+
+// ================================================================
+//  КЛИК
+// ================================================================
+function clickCoin(e) {
+    if (activeEffect && activeEffect.type === 'infinite_energy') {
+        game.coins += game.clickPower;
+        game.totalClicks += 1;
+        spawnFloatText('+' + formatNumber(game.clickPower), e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+        playClickSound();
+        updateUI();
+        return;
+    }
+    if (activeEffect && activeEffect.type === 'double_income') {
+        if (game.energy < 1) { shakeElement(document.getElementById('clickCoin')); return; }
+        game.energy -= 1;
+        game.coins += game.clickPower * 2;
+        game.totalClicks += 1;
+        spawnFloatText('+' + formatNumber(game.clickPower * 2), e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+        playClickSound();
+        updateUI();
+        return;
+    }
+    if (activeEffect && activeEffect.type === 'infinite_clicks') {
+        game.coins += game.clickPower;
+        game.totalClicks += 1;
+        spawnFloatText('+' + formatNumber(game.clickPower), e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+        playClickSound();
+        updateUI();
+        return;
+    }
+    if (game.energy < 1) { shakeElement(document.getElementById('clickCoin')); return; }
+    game.energy -= 1;
+    game.coins += game.clickPower;
+    game.totalClicks += 1;
+    spawnFloatText('+' + formatNumber(game.clickPower), e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+    playClickSound();
+    updateUI();
+}
+
+// ================================================================
+//  ЗВУКИ
+// ================================================================
+let audioCtx = null;
+function playClickSound() {
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const notes = [523, 659];
+        notes.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime + i * 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.06 + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + i * 0.06);
+            osc.stop(audioCtx.currentTime + i * 0.06 + 0.1);
+        });
+    } catch(e) {}
+}
+
+function playPurchaseSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const notes = [523, 659, 784, 1047];
+        notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.1, ctx.currentTime + i * 0.08);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.15);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + i * 0.08);
+            osc.stop(ctx.currentTime + i * 0.08 + 0.15);
+        });
+    } catch(e) {}
+}
+
+// ================================================================
+//  МАГАЗИН
+// ================================================================
+function getClickPowerCost() {
+    const level = game.clickPower - 1;
+    return Math.floor(10 * Math.pow(1.09, level));
+}
+function buyPower() {
+    const cost = getClickPowerCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.clickPower += 1;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+function getMaxEnergyCost() {
+    const level = Math.floor((game.maxEnergy - 100) / 20);
+    return Math.floor(25 * Math.pow(1.5, level));
+}
+function buyMaxEnergy() {
+    const cost = getMaxEnergyCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.maxEnergy += 20;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+function getRegenCost() {
+    return Math.floor(30 * Math.pow(1.5, game.regenLevel || 0));
+}
+function getRegenPerSecond() {
+    return 0.4 + (game.regenLevel || 0) * 0.05;
+}
+function buyRegen() {
+    const cost = getRegenCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.regenLevel = (game.regenLevel || 0) + 1;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+function getIncomeLevel() { return game.incomeLevel || 0; }
+function getIncomeCost() {
+    const level = getIncomeLevel();
+    if (level >= 150) return Infinity;
+    return Math.floor(1000 * Math.pow(1.08, level));
+}
+function buyIncome() {
+    const level = getIncomeLevel();
+    if (level >= 150) return;
+    const cost = getIncomeCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.incomeLevel = level + 1;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+function renderShop() {
+    const container = document.getElementById('shopGrid');
+    container.innerHTML = '';
+    const items = [
+        { name:'Сила клика', icon:'fa-hand-fist', desc:'+1 к доходу', cost:getClickPowerCost(), level:game.clickPower-1, buy:buyPower },
+        { name:'Запас энергии', icon:'fa-battery-full', desc:'+20 к макс.', cost:getMaxEnergyCost(), level:game.maxEnergy, buy:buyMaxEnergy },
+        { name:'Регенерация', icon:'fa-bolt', desc:'+0.05/сек', cost:getRegenCost(), level:game.regenLevel||0, buy:buyRegen },
+        { name:'Доход в сек', icon:'fa-clock', desc:'+10/сек (до 150 ур.)', cost:getIncomeCost(), level:game.incomeLevel||0, buy:buyIncome }
+    ];
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'shop-card' + (game.coins >= item.cost && item.level < (item.name === 'Доход в сек' ? 150 : 999) ? '' : ' disabled');
+        div.innerHTML = `
+            <div class="icon"><i class="fas ${item.icon}"></i></div>
+            <div class="name">${item.name}</div>
+            <div class="desc">${item.desc}</div>
+            <div class="price"><i class="fas fa-coins"></i> ${formatNumber(item.cost)}</div>
+            <div class="level">Уровень ${item.level}</div>
+        `;
+        if (game.coins >= item.cost && item.level < (item.name === 'Доход в сек' ? 150 : 999)) div.addEventListener('click', item.buy);
+        container.appendChild(div);
+    });
+}
+
+// ================================================================
+//  АЛМАЗНЫЙ МАГАЗИН
+// ================================================================
+function getDiamondAutoCost() {
+    const level = game.diamondAutoLevel || 0;
+    if (level >= 5) return Infinity;
+    return 10 + level * 10;
+}
+function buyDiamondAuto() {
+    const level = game.diamondAutoLevel || 0;
+    if (level >= 5) return;
+    const cost = getDiamondAutoCost();
+    if (game.diamonds >= cost) {
+        game.diamonds -= cost;
+        game.diamondAutoLevel = level + 1;
+        game.clickPower += 10;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+function getDiamondIncomeCost() {
+    const level = game.diamondIncomeLevel || 0;
+    if (level >= 10) return Infinity;
+    return 10;
+}
+function buyDiamondIncome() {
+    const level = game.diamondIncomeLevel || 0;
+    if (level >= 10) return;
+    const cost = getDiamondIncomeCost();
+    if (game.diamonds >= cost) {
+        game.diamonds -= cost;
+        game.diamondIncomeLevel = level + 1;
+        game.incomeBonus = (game.incomeBonus || 0) + 5;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+function renderDiamondShop() {
+    const container = document.getElementById('diamondShop');
+    container.innerHTML = '';
+    const autoLevel = game.diamondAutoLevel || 0;
+    const autoCost = getDiamondAutoCost();
+    const canBuyAuto = game.diamonds >= autoCost && autoLevel < 5;
+    const divAuto = document.createElement('div');
+    divAuto.className = 'shop-card' + (canBuyAuto ? '' : ' disabled');
+    divAuto.innerHTML = `
+        <div class="icon"><i class="fas fa-rocket"></i></div>
+        <div class="name">Мощный клик</div>
+        <div class="desc">+10 к силе клика</div>
+        <div class="price"><i class="fas fa-gem"></i> ${autoCost}</div>
+        <div class="level">Уровень ${autoLevel}/5</div>
+    `;
+    if (canBuyAuto) divAuto.addEventListener('click', buyDiamondAuto);
+    container.appendChild(divAuto);
+
+    const incLevel = game.diamondIncomeLevel || 0;
+    const incCost = getDiamondIncomeCost();
+    const canBuyInc = game.diamonds >= incCost && incLevel < 10;
+    const divInc = document.createElement('div');
+    divInc.className = 'shop-card' + (canBuyInc ? '' : ' disabled');
+    divInc.innerHTML = `
+        <div class="icon"><i class="fas fa-chart-line"></i></div>
+        <div class="name">Ускорение дохода</div>
+        <div class="desc">+5 к доходу/сек</div>
+        <div class="price"><i class="fas fa-gem"></i> ${incCost}</div>
+        <div class="level">Уровень ${incLevel}/10</div>
+    `;
+    if (canBuyInc) divInc.addEventListener('click', buyDiamondIncome);
+    container.appendChild(divInc);
+}
+
+// ================================================================
+//  УСКОРЕНИЕ АЛМАЗОВ
+// ================================================================
+function getDiamondInterval() {
+    const level = game.diamondSpeedLevel || 0;
+    const intervals = [10, 9, 8, 7, 6, 5];
+    return intervals[level] || 10;
+}
+function getDiamondSpeedCost() {
+    const level = game.diamondSpeedLevel || 0;
+    const prices = [1000000, 5000000, 10000000, 20000000, 50000000];
+    return prices[level] || 999999999;
+}
+function buyDiamondSpeed() {
+    const level = game.diamondSpeedLevel || 0;
+    if (level >= 5) return;
+    const cost = getDiamondSpeedCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.diamondSpeedLevel = level + 1;
+        playPurchaseSound();
+        updateUI();
+    }
+}
+function renderDiamondSpeedShop() {
+    const container = document.getElementById('diamondSpeedShop');
+    container.innerHTML = '';
+    const level = game.diamondSpeedLevel || 0;
+    if (level >= 5) {
+        container.innerHTML = '<p style="color:#4fc3f7; font-size:12px; text-align:center;">✅ Максимальный уровень (5 мин)</p>';
+        return;
+    }
+    const cost = getDiamondSpeedCost();
+    const canBuy = game.coins >= cost;
+    const currentInterval = getDiamondInterval();
+    const nextInterval = getDiamondInterval() - 1;
+    const div = document.createElement('div');
+    div.className = 'shop-card' + (canBuy ? '' : ' disabled');
+    div.innerHTML = `
+        <div class="icon"><i class="fas fa-clock"></i></div>
+        <div class="name">Ускорение</div>
+        <div class="desc">${currentInterval} мин → ${nextInterval} мин</div>
+        <div class="price"><i class="fas fa-coins"></i> ${formatNumber(cost)}</div>
+        <div class="level">Уровень ${level}/5</div>
+    `;
+    if (canBuy) div.addEventListener('click', buyDiamondSpeed);
+    container.appendChild(div);
+}
+function updateDiamondTimer() {
+    const interval = getDiamondInterval() * 60;
+    const now = Date.now();
+    const last = game.lastDiamondTime || now;
+    const elapsed = (now - last) / 1000;
+    const remaining = Math.max(0, interval - elapsed);
+    const minutes = Math.floor(remaining / 60);
+    const seconds = Math.floor(remaining % 60);
+    document.getElementById('diamondTimer').textContent = `⏳ Следующий алмаз через: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    document.getElementById('diamondIntervalDisplay').textContent = getDiamondInterval();
+}
+
+// ================================================================
+//  СУНДУК
+// ================================================================
+function openChest() {
+    if (game.diamonds < 10) {
+        document.getElementById('chestResult').textContent = '❌ Недостаточно алмазов!';
+        return;
+    }
+    game.diamonds -= 10;
+    const rand = Math.random();
+    let prize = 0;
+    if (rand < 0.60) prize = Math.floor(2000 + Math.random() * 3000);
+    else if (rand < 0.85) prize = Math.floor(5000 + Math.random() * 5000);
+    else if (rand < 0.95) prize = Math.floor(10000 + Math.random() * 5000);
+    else if (rand < 0.99) prize = Math.floor(15000 + Math.random() * 3000);
+    else prize = Math.floor(18000 + Math.random() * 2000);
+    game.coins += prize;
+    game.chestOpened = (game.chestOpened || 0) + 1;
+    document.getElementById('chestResult').textContent = '🎉 Вы выиграли ' + formatNumber(prize) + ' монет!';
+    playPurchaseSound();
+    updateUI();
+}
+
+// ================================================================
+//  ПРОФИЛЬ
+// ================================================================
+function updateProfile() {
+    if (!currentUser || !game) return;
+    document.getElementById('profileNick').textContent = currentUser;
+    const regDate = new Date(game.registeredAt || Date.now());
+    document.getElementById('profileRegistered').textContent = regDate.toLocaleDateString() + ' ' + regDate.toLocaleTimeString();
+    document.getElementById('profileClicks').textContent = formatNumber(game.totalClicks || 0);
+    document.getElementById('profileChests').textContent = game.chestOpened || 0;
+    const seconds = Math.floor((Date.now() - (game.registeredAt || Date.now())) / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    if (hours > 0) document.getElementById('profileTime').textContent = hours + 'ч ' + (minutes % 60) + 'м';
+    else document.getElementById('profileTime').textContent = minutes + ' мин';
+    let totalQuests = 0;
+    for (let chain in questChains) {
+        totalQuests += game.questProgress[chain] || 0;
+    }
+    document.getElementById('profileQuests').textContent = totalQuests;
+    let potionCount = 0;
+    if (game.inventory) {
+        for (let p of game.inventory.potions) potionCount += p.count || 0;
+    }
+    document.getElementById('profilePotions').textContent = potionCount;
+    loadUserData(currentUser).then(data => {
+        const followers = data ? data.followers || [] : [];
+        document.getElementById('profileFollowers').textContent = followers.length;
+    });
+}
+
+// ================================================================
+//  ЛИДЕРБОРД И ПРОСМОТР ПРОФИЛЯ
+// ================================================================
+let leaderboardResetTime = Date.now();
+const CYCLE_MS = 24 * 60 * 60 * 1000;
+
+function getCycleStart() {
+    const now = Date.now();
+    const elapsed = now - leaderboardResetTime;
+    if (elapsed >= CYCLE_MS) {
+        leaderboardResetTime = now;
+        resetLeaderboard();
+    }
+    return leaderboardResetTime;
+}
+
+async function resetLeaderboard() {
+    const users = await loadAllUsers();
+    const list = [];
+    for (let nick in users) {
+        if (users[nick].game) {
+            list.push({ nickname: nick, coins: users[nick].game.coins || 0 });
+        }
+    }
+    list.sort((a,b) => b.coins - a.coins);
+    list.forEach((entry, idx) => {
+        let reward = 0;
+        if (idx === 0) reward = 100;
+        else if (idx === 1) reward = 75;
+        else if (idx === 2) reward = 50;
+        else if (idx < 10) reward = 10;
+        else if (idx < 25) reward = 5;
+        else if (idx < 100) reward = 1;
+        if (reward > 0) {
+            const userData = users[entry.nickname];
+            if (userData && userData.game) {
+                userData.game.diamonds = (userData.game.diamonds || 0) + reward;
+                saveUserData(entry.nickname, userData);
+            }
+        }
+    });
+    for (let nick in users) {
+        if (users[nick].game) {
+            users[nick].game.coins = 0;
+            saveUserData(nick, users[nick]);
+        }
+    }
+    leaderboardCache = null;
+}
+
+function updateLeaderboardTimer() {
+    const now = Date.now();
+    const elapsed = now - leaderboardResetTime;
+    const remaining = Math.max(0, CYCLE_MS - elapsed);
+    const hours = Math.floor(remaining / (60 * 60 * 1000));
+    const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+    const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
+    document.getElementById('leaderboardTimer').textContent =
+        `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+}
+
+async function renderLeaderboard() {
+    const container = document.getElementById('leaderList');
+    const now = Date.now();
+    if (leaderboardCache && (now - leaderboardCacheTime) < 5000) {
+        container.innerHTML = leaderboardCache;
+        return;
+    }
+    container.innerHTML = 'Загрузка...';
+    const users = await loadAllUsers();
+    const list = [];
+    for (let nick in users) {
+        if (users[nick].game) {
+            list.push({ nickname: nick, coins: users[nick].game.coins || 0, admin: users[nick].admin || false, superadmin: users[nick].superadmin || false });
+        }
+    }
+    list.sort((a,b) => b.coins - a.coins);
+    const top = list.slice(0, 50);
+    let html = '';
+    if (top.length === 0) {
+        html = '<p style="text-align:center;color:#7a8a9e;font-size:13px;">Пока никого нет</p>';
+    } else {
+        top.forEach((entry, idx) => {
+            const isMe = entry.nickname === currentUser;
+            let rankClass = '';
+            if (idx === 0) rankClass = 'gold';
+            else if (idx === 1) rankClass = 'silver';
+            else if (idx === 2) rankClass = 'bronze';
+            let badges = '';
+            if (entry.superadmin) badges += '<span class="badge-icon super"><i class="fas fa-crown"></i></span>';
+            else if (entry.admin) badges += '<span class="badge-icon admin"><i class="fas fa-check-circle"></i></span>';
+            html += `
+                <div class="leader-item" style="${isMe ? 'border-left-color:#4fc3f7;' : ''}" data-nick="${entry.nickname}">
+                    <span class="rank ${rankClass}">#${idx+1}</span>
+                    <span class="name">${entry.nickname} ${badges} ${isMe ? '⭐' : ''}</span>
+                    <span class="score">${formatNumber(entry.coins)}</span>
+                </div>
+            `;
+        });
+    }
+    container.innerHTML = html;
+    leaderboardCache = html;
+    leaderboardCacheTime = now;
+    container.querySelectorAll('.leader-item[data-nick]').forEach(item => {
+        item.addEventListener('click', function() {
+            const nick = this.dataset.nick;
+            if (nick) showPlayerProfile(nick);
+        });
+    });
+}
+
+// ================================================================
+//  ПРОФИЛЬ В МОДАЛЬНОМ ОКНЕ
+// ================================================================
+async function showPlayerProfile(nick) {
+    const data = await loadUserData(nick);
+    if (!data) return;
+    const g = data.game || {};
+    const modal = document.getElementById('profileModal');
+    const content = document.getElementById('profileModalContent');
+    const actions = document.getElementById('profileModalActions');
+    const title = document.getElementById('profileModalTitle');
+
+    const regDate = g.registeredAt ? new Date(g.registeredAt) : new Date();
+    const seconds = Math.floor((Date.now() - (g.registeredAt || Date.now())) / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    let timeStr = minutes + ' мин';
+    if (hours > 0) timeStr = hours + 'ч ' + (minutes % 60) + 'м';
+    let questCount = 0;
+    if (g.questProgress) {
+        for (let chain in g.questProgress) questCount += g.questProgress[chain] || 0;
+    }
+    const currentUserData = await loadUserData(currentUser);
+    const following = currentUserData ? currentUserData.following || [] : [];
+    const isFollowing = following.includes(nick);
+    const followers = data.followers || [];
+    const followerCount = followers.length;
+
+    content.innerHTML = `
+        <div class="profile-detail"><span class="label">Ник</span><span>${nick}</span></div>
+        <div class="profile-detail"><span class="label">Зарегистрирован</span><span>${regDate.toLocaleDateString()}</span></div>
+        <div class="profile-detail"><span class="label">Кликов</span><span>${formatNumber(g.totalClicks || 0)}</span></div>
+        <div class="profile-detail"><span class="label">Открыто сундуков</span><span>${g.chestOpened || 0}</span></div>
+        <div class="profile-detail"><span class="label">Выполнено квестов</span><span>${questCount}</span></div>
+        <div class="profile-detail"><span class="label">Время в игре</span><span>${timeStr}</span></div>
+        <div class="profile-detail"><span class="label">Монеты</span><span>${formatNumber(g.coins || 0)}</span></div>
+        <div class="profile-detail"><span class="label">Алмазы</span><span>${formatNumber(g.diamonds || 0)}</span></div>
+        <div class="profile-detail"><span class="label">Подписчики</span><span>${followerCount}</span></div>
+    `;
+
+    actions.innerHTML = '';
+    if (nick !== currentUser) {
+        const subBtn = document.createElement('button');
+        subBtn.className = 'subscribe-btn' + (isFollowing ? ' subscribed' : '');
+        subBtn.textContent = isFollowing ? '✅ Отписаться' : '➕ Подписаться';
+        subBtn.addEventListener('click', async function() {
+            const userData = await loadUserData(currentUser);
+            let followingList = userData ? userData.following || [] : [];
+            if (isFollowing) {
+                followingList = followingList.filter(n => n !== nick);
+            } else {
+                followingList.push(nick);
+            }
+            const currentData = await loadUserData(currentUser);
+            currentData.following = followingList;
+            saveUserData(currentUser, currentData);
+            const targetData = await loadUserData(nick);
+            let followersList = targetData ? targetData.followers || [] : [];
+            if (isFollowing) {
+                followersList = followersList.filter(n => n !== currentUser);
+            } else {
+                if (!followersList.includes(currentUser)) followersList.push(currentUser);
+            }
+            targetData.followers = followersList;
+            saveUserData(nick, targetData);
+            showPlayerProfile(nick);
+        });
+        actions.appendChild(subBtn);
+    }
+
+    const currentAdmin = currentUserData ? currentUserData.admin : false;
+    const currentSuper = currentUserData ? currentUserData.superadmin : false;
+    if (currentAdmin || currentSuper) {
+        const addCoins = (amount) => {
+            g.coins = (g.coins || 0) + amount;
+            data.game = g;
+            saveUserData(nick, data);
+            showPlayerProfile(nick);
+            updateUI();
+        };
+        const addDiamonds = (amount) => {
+            g.diamonds = (g.diamonds || 0) + amount;
+            data.game = g;
+            saveUserData(nick, data);
+            showPlayerProfile(nick);
+            updateUI();
+        };
+        actions.appendChild(createActionBtn('+100', () => addCoins(100)));
+        actions.appendChild(createActionBtn('+1000', () => addCoins(1000)));
+        actions.appendChild(createActionBtn('+10000', () => addCoins(10000)));
+        actions.appendChild(createActionBtn('-100', () => addCoins(-100)));
+        actions.appendChild(createActionBtn('-1000', () => addCoins(-1000)));
+        actions.appendChild(createActionBtn('-10000', () => addCoins(-10000)));
+        actions.appendChild(createActionBtn('+1💎', () => addDiamonds(1)));
+        actions.appendChild(createActionBtn('+10💎', () => addDiamonds(10)));
+        actions.appendChild(createActionBtn('+100💎', () => addDiamonds(100)));
+        actions.appendChild(createActionBtn('-1💎', () => addDiamonds(-1)));
+        actions.appendChild(createActionBtn('-10💎', () => addDiamonds(-10)));
+        actions.appendChild(createActionBtn('-100💎', () => addDiamonds(-100)));
+    }
+    if (currentSuper && nick !== currentUser) {
+        const delBtn = document.createElement('button');
+        delBtn.className = 'danger';
+        delBtn.textContent = '🗑️ Удалить аккаунт';
+        delBtn.addEventListener('click', async function() {
+            if (confirm(`Удалить аккаунт игрока ${nick}? Это действие необратимо!`)) {
+                await database.ref('users/' + nick).remove();
+                alert('Аккаунт удалён');
+                document.getElementById('profileModal').style.display = 'none';
+                updateUI();
+            }
+        });
+        actions.appendChild(delBtn);
+    }
+
+    modal.style.display = 'flex';
+}
+
+function createActionBtn(text, callback) {
+    const btn = document.createElement('button');
+    btn.textContent = text;
+    btn.addEventListener('click', callback);
+    return btn;
+}
+
+document.getElementById('profileModalClose').addEventListener('click', function() {
+    document.getElementById('profileModal').style.display = 'none';
+});
+document.getElementById('profileModal').addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+});
+
+// ================================================================
+//  СООБЩЕНИЯ
+// ================================================================
+async function sendMessage() {
+    const msg = document.getElementById('msgInput').value.trim();
+    if (!msg) return;
+    const data = await loadUserData(currentUser);
+    const messages = data ? data.messages || [] : [];
+    messages.push({ from: currentUser, text: msg, time: new Date().toISOString() });
+    if (data) {
+        data.messages = messages;
+        saveUserData(currentUser, data);
+    }
+    document.getElementById('msgInput').value = '';
+    loadMessages();
+    alert('Сообщение отправлено администратору!');
+}
+
+async function loadMessages() {
+    const container = document.getElementById('msgList');
+    const data = await loadUserData(currentUser);
+    const messages = data ? data.messages || [] : [];
+    if (messages.length === 0) {
+        container.innerHTML = '<p style="color:#7a8a9e; font-size:12px; text-align:center;">Нет сообщений</p>';
+        return;
+    }
+    container.innerHTML = messages.map(m => `
+        <div class="msg-item">
+            <span class="msg-sender">${m.from}</span>
+            <span class="msg-text">${m.text}</span>
+            <span class="msg-time">${new Date(m.time).toLocaleTimeString()}</span>
+        </div>
+    `).join('');
+}
+
+// ================================================================
+//  ВСПОМОГАТЕЛЬНЫЕ
+// ================================================================
+function shakeElement(el) {
+    el.style.animation = 'none';
+    void el.offsetHeight;
+    el.style.animation = 'shake 0.2s';
+    setTimeout(() => el.style.animation = '', 300);
+}
+
+function spawnFloatText(text, ev) {
+    const el = document.createElement('div');
+    el.className = 'float-text';
+    el.textContent = text;
+    const x = ev.clientX || window.innerWidth/2;
+    const y = ev.clientY || window.innerHeight/2 - 40;
+    el.style.left = (x - 30 + (Math.random()*40-20)) + 'px';
+    el.style.top = (y - 20) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+}
+
+// ================================================================
+//  ВЫХОД
+// ================================================================
+function logout() {
+    if (confirm('Выйти из аккаунта?')) {
+        if (window._incomeInterval) clearInterval(window._incomeInterval);
+        if (window._energyInterval) clearInterval(window._energyInterval);
+        if (window._diamondInterval) clearInterval(window._diamondInterval);
+        if (window._diamondTimerInterval) clearInterval(window._diamondTimerInterval);
+        if (window._leaderboardTimer) clearInterval(window._leaderboardTimer);
+        if (autoClickerIntervalId) clearInterval(autoClickerIntervalId);
+        window._incomeInterval = null;
+        window._energyInterval = null;
+        window._diamondInterval = null;
+        window._diamondTimerInterval = null;
+        window._leaderboardTimer = null;
+        autoClickerIntervalId = null;
+        activeEffect = null;
+        currentUser = null;
+        game = null;
+        appEl.style.display = 'none';
+        authScreen.style.display = 'flex';
+        authStep1.classList.remove('hidden');
+        authStep2.classList.add('hidden');
+        authNick.value = '';
+        authPass.value = '';
+        authError.textContent = '';
+        document.getElementById('effectIndicator').style.display = 'none';
+    }
+}
+
+// ================================================================
+//  ЗАПУСК
+// ================================================================
+authScreen.style.display = 'flex';
+appEl.style.display = 'none';
+
+console.log('CryptoClicker PRO — финальная стабильная версия со всеми филиалами и квестами.');
+</script>
+</body>
+</html>

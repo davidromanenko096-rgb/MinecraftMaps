@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CryptoClicker Online</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; font-family:'Segoe UI',sans-serif; user-select:none; }
+        body { background:#0b0e14; color:#e0e0e0; min-height:100vh; display:flex; justify-content:center; align-items:center; padding:10px; }
+        #app { max-width:420px; width:100%; background:#141a24; border-radius:24px; box-shadow:0 10px 30px rgba(0,0,0,0.7); overflow:hidden; position:relative; padding-bottom:56px; display:none; }
+        .header { background:#1e2633; padding:10px 14px; display:flex; justify-content:space-between; align-items:center; border-bottom:2px solid #2a3342; }
+        .header .title { font-weight:700; font-size:15px; background:linear-gradient(45deg,#f7b731,#f5a623); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+        .header .balance { display:flex; gap:10px; font-size:13px; }
+        .header .balance span { display:flex; align-items:center; gap:3px; background:#0f151e; padding:2px 8px; border-radius:14px; border:1px solid #2a3342; }
+        .fa-coins { color:#f7b731; }
+        .fa-gem { color:#4fc3f7; }
+        .content { padding:14px; min-height:280px; }
+        .tab { display:none; animation:fadeIn 0.2s; }
+        .tab.active { display:block; }
+        @keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+        .click-area { display:flex; flex-direction:column; align-items:center; }
+        .big-balance { display:flex; gap:20px; font-size:20px; font-weight:700; margin-bottom:6px; background:#0f151e; padding:4px 14px; border-radius:30px; border:1px solid #2a3342; }
+        .big-balance .coins { color:#f7b731; }
+        .big-balance .diamonds { color:#4fc3f7; }
+        .diamond-timer { font-size:13px; color:#4fc3f7; margin-bottom:6px; background:#0f151e; padding:2px 12px; border-radius:20px; border:1px solid #2a3342; }
+        .click-coin { width:110px; height:110px; border-radius:50%; background:radial-gradient(circle at 30% 30%,#f7d875,#e6a020); box-shadow:0 0 0 6px #2a3342,0 8px 20px rgba(0,0,0,0.6); display:flex; justify-content:center; align-items:center; font-size:48px; color:#fff; text-shadow:0 2px 8px rgba(0,0,0,0.5); cursor:pointer; transition:transform 0.1s,box-shadow 0.1s; margin-bottom:10px; position:relative; }
+        .click-coin:active { transform:scale(0.92); box-shadow:0 0 0 10px #3e4a5e,0 4px 15px rgba(0,0,0,0.8); }
+        .click-coin .fa-bolt { font-size:24px; opacity:0.2; position:absolute; bottom:6px; right:6px; }
+        .energy-bar { width:100%; background:#1e2633; height:8px; border-radius:20px; margin:4px 0 8px; overflow:hidden; border:1px solid #2a3342; }
+        .energy-fill { height:100%; background:linear-gradient(90deg,#4fc3f7,#29b6f6); border-radius:20px; transition:width 0.15s; }
+        .energy-text { display:flex; justify-content:space-between; font-size:11px; color:#a0b0c0; }
+        .stats { display:grid; grid-template-columns:1fr 1fr; gap:6px; width:100%; margin-top:8px; background:#1a222e; border-radius:12px; padding:8px; }
+        .stats-item { text-align:center; background:#0f151e; padding:4px 0; border-radius:8px; }
+        .stats-item .label { font-size:9px; color:#7a8a9e; }
+        .stats-item .value { font-size:14px; font-weight:600; }
+        .shop-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
+        .shop-card { background:#1a222e; border-radius:12px; padding:10px 6px; text-align:center; border:1px solid #2a3342; transition:0.2s; cursor:pointer; }
+        .shop-card:hover { border-color:#f7b731; transform:translateY(-2px); }
+        .shop-card .icon { font-size:22px; color:#f7b731; margin-bottom:2px; }
+        .shop-card .name { font-weight:600; font-size:13px; }
+        .shop-card .desc { font-size:10px; color:#8a9aaa; margin:2px 0 4px; }
+        .shop-card .price { display:inline-block; background:#0f151e; padding:2px 10px; border-radius:16px; font-size:12px; border:1px solid #2a3342; }
+        .shop-card .price i { margin-right:3px; }
+        .shop-card .level { font-size:10px; color:#4fc3f7; margin-top:3px; }
+        .shop-card.disabled { opacity:0.5; pointer-events:none; }
+        .diamond-shop .shop-card .icon { color:#4fc3f7; }
+        .diamond-shop .shop-card .price { border-color:#4fc3f7; }
+        .leaderboard-list { margin-top:6px; max-height:300px; overflow-y:auto; }
+        .leader-item { display:flex; justify-content:space-between; padding:6px 12px; background:#1a222e; border-radius:8px; margin-bottom:4px; border-left:3px solid #f7b731; }
+        .leader-item .rank { font-weight:700; color:#f7b731; width:24px; font-size:13px; }
+        .leader-item .name { flex:1; margin-left:8px; font-size:13px; }
+        .leader-item .score { font-weight:600; font-size:13px; }
+        .settings-group { background:#1a222e; border-radius:12px; padding:12px; margin-top:6px; }
+        .settings-group label { display:block; font-size:12px; margin-bottom:3px; color:#aabaca; }
+        .settings-group input { width:100%; padding:6px 10px; background:#0f151e; border:1px solid #2a3342; border-radius:8px; color:#e0e0e0; font-size:14px; outline:none; }
+        .settings-group input:focus { border-color:#f7b731; }
+        .settings-group .btn { margin-top:8px; background:#f7b731; color:#0b0e14; border:none; padding:8px; border-radius:20px; font-weight:700; font-size:14px; width:100%; cursor:pointer; transition:0.2s; }
+        .settings-group .btn:hover { background:#f5a623; }
+        .settings-group .btn-danger { background:#e74c3c; color:white; }
+        .settings-group .btn-danger:hover { background:#c0392b; }
+        #adminPanel { display:none; margin-top:10px; border-top:2px solid #2a3342; padding-top:10px; }
+        #adminPanel.show { display:block; }
+        .admin-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+        .admin-grid .admin-item { background:#0f151e; padding:6px; border-radius:8px; text-align:center; }
+        .admin-grid .admin-item label { font-size:10px; color:#8a9aaa; }
+        .admin-grid .admin-item input { width:100%; padding:3px; background:#1a222e; border:1px solid #2a3342; border-radius:4px; color:#e0e0e0; margin-top:3px; text-align:center; font-size:13px; }
+        .admin-grid .admin-item .btn-small { margin-top:3px; background:#4fc3f7; border:none; padding:2px 8px; border-radius:12px; font-weight:600; color:#0b0e14; cursor:pointer; font-size:11px; }
+        .bottom-nav { position:absolute; bottom:0; left:0; right:0; background:#1a222e; display:flex; justify-content:space-around; padding:4px 0 8px; border-top:2px solid #2a3342; }
+        .nav-item { display:flex; flex-direction:column; align-items:center; font-size:10px; color:#7a8a9e; cursor:pointer; padding:2px 6px; border-radius:12px; transition:0.2s; background:transparent; border:none; gap:1px; }
+        .nav-item i { font-size:18px; }
+        .nav-item.active { color:#f7b731; background:#0f151e; }
+        .nav-item.active i { color:#f7b731; }
+        .float-text { position:fixed; pointer-events:none; font-size:22px; font-weight:700; color:#f7b731; text-shadow:0 0 20px rgba(247,183,49,0.5); animation:floatUp 0.7s ease-out forwards; z-index:100; }
+        @keyframes floatUp { 0%{opacity:1;transform:translateY(0) scale(1)} 100%{opacity:0;transform:translateY(-80px) scale(1.3)} }
+        @keyframes shake { 0%{transform:translateX(0)} 25%{transform:translateX(-6px)} 50%{transform:translateX(6px)} 75%{transform:translateX(-3px)} 100%{transform:translateX(0)} }
+        .chest-btn { background:#f7b731; border:none; padding:10px; border-radius:24px; font-weight:700; font-size:16px; width:100%; cursor:pointer; color:#0b0e14; margin-top:8px; transition:0.2s; }
+        .chest-btn:hover { background:#f5a623; transform:scale(1.02); }
+        .chest-btn:disabled { opacity:0.5; cursor:not-allowed; transform:none; }
+        .brand-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:6px; }
+        .brand-card { background:#1a222e; border-radius:12px; padding:10px 6px; text-align:center; border:1px solid #2a3342; cursor:pointer; transition:0.2s; }
+        .brand-card:hover { border-color:#4fc3f7; transform:translateY(-2px); }
+        .brand-card .icon { font-size:28px; margin-bottom:2px; }
+        .brand-card .name { font-weight:600; font-size:13px; }
+        .brand-card .level { font-size:10px; color:#4fc3f7; margin:2px 0; }
+        .brand-card .income { font-size:11px; color:#aabaca; }
+        .brand-card .price { font-size:12px; color:#f7b731; }
+        .brand-card.disabled { opacity:0.5; pointer-events:none; }
+        .auth-screen { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:400px; padding:20px; }
+        .auth-screen h2 { color:#f7b731; margin-bottom:20px; font-size:24px; }
+        .auth-screen input { width:100%; padding:12px; background:#0f151e; border:1px solid #2a3342; border-radius:12px; color:#e0e0e0; font-size:16px; margin-bottom:12px; outline:none; }
+        .auth-screen input:focus { border-color:#f7b731; }
+        .auth-screen .btn { width:100%; padding:12px; border:none; border-radius:12px; font-weight:700; font-size:16px; cursor:pointer; transition:0.2s; }
+        .auth-screen .btn-primary { background:#f7b731; color:#0b0e14; }
+        .auth-screen .btn-primary:hover { background:#f5a623; }
+        .auth-screen .btn-secondary { background:#2a3342; color:#e0e0e0; margin-top:8px; }
+        .auth-screen .btn-secondary:hover { background:#3e4a5e; }
+        .auth-screen .error { color:#e74c3c; font-size:14px; margin-bottom:10px; min-height:20px; }
+        .auth-screen .switch-text { margin-top:12px; font-size:14px; color:#8a9aaa; }
+        .auth-screen .switch-text span { color:#4fc3f7; cursor:pointer; }
+        .auth-screen .switch-text span:hover { text-decoration:underline; }
+        @media (max-width:420px){ .header .balance span{font-size:11px;padding:2px 6px;} .big-balance{font-size:17px;gap:14px;} .click-coin{width:90px;height:90px;font-size:38px;} .shop-grid{grid-template-columns:1fr 1fr;} .brand-grid{grid-template-columns:1fr 1fr;} }
+    </style>
+</head>
+<body>
+
+<!-- ЭКРАН ВХОДА -->
+<div id="authScreen" class="auth-screen">
+    <h2>🔐 CryptoClicker</h2>
+    <div class="error" id="authError"></div>
+    <input type="text" id="authNick" placeholder="Никнейм">
+    <input type="password" id="authPass" placeholder="Пароль">
+    <button class="btn btn-primary" id="authLoginBtn">Войти</button>
+    <button class="btn btn-secondary" id="authRegisterBtn">Зарегистрироваться</button>
+    <div class="switch-text" id="authSwitch">
+        Нет аккаунта? <span id="authSwitchLink">Зарегистрироваться</span>
+    </div>
+</div>
+
+<!-- ОСНОВНАЯ ИГРА -->
+<div id="app">
+    <div class="header">
+        <div class="title"><i class="fas fa-bolt" style="color:#f7b731;margin-right:4px;"></i>CryptoClicker</div>
+        <div class="balance">
+            <span><i class="fas fa-coins"></i> <span id="headerCoins">0</span></span>
+            <span><i class="fas fa-gem"></i> <span id="headerDiamonds">0</span></span>
+            <span style="font-size:10px; background:transparent; border:none; padding:0;">👤 <span id="headerNick">Игрок</span></span>
+        </div>
+    </div>
+    <div class="content">
+        <!-- Главная -->
+        <div id="tabMain" class="tab active">
+            <div class="click-area">
+                <div class="big-balance">
+                    <span class="coins"><i class="fas fa-coins"></i> <span id="mainCoins">0</span></span>
+                    <span class="diamonds"><i class="fas fa-gem"></i> <span id="mainDiamonds">0</span></span>
+                </div>
+                <div class="diamond-timer" id="diamondTimer">⏳ Следующий алмаз через: 10:00</div>
+                <div class="click-coin" id="clickCoin"><i class="fas fa-coins"></i><i class="fas fa-bolt"></i></div>
+                <div class="energy-bar"><div class="energy-fill" id="energyFill" style="width:100%"></div></div>
+                <div class="energy-text"><span>⚡ Энергия</span><span id="energyLabel">100 / 100</span></div>
+                <div class="stats">
+                    <div class="stats-item"><div class="label">Кликов</div><div class="value" id="statClicks">0</div></div>
+                    <div class="stats-item"><div class="label">Доход за клик</div><div class="value" id="statClickPower">1</div></div>
+                    <div class="stats-item"><div class="label">Макс. энергия</div><div class="value" id="statMaxEnergy">100</div></div>
+                    <div class="stats-item"><div class="label">Пассивный доход</div><div class="value" id="statPassive">0/сек</div></div>
+                </div>
+            </div>
+        </div>
+        <!-- Магазин -->
+        <div id="tabShop" class="tab"><h3 style="margin-bottom:4px;font-size:15px;"><i class="fas fa-store"></i> Магазин</h3><div class="shop-grid" id="shopGrid"></div></div>
+        <!-- Алмазный магазин -->
+        <div id="tabDiamond" class="tab">
+            <h3 style="margin-bottom:4px;font-size:15px;"><i class="fas fa-gem"></i> Алмазные улучшения</h3>
+            <div class="shop-grid diamond-shop" id="diamondShop"></div>
+            <div style="margin-top:10px; background:#1a222e; border-radius:12px; padding:12px;">
+                <h4 style="color:#4fc3f7; font-size:13px;">Ускорение алмазов</h4>
+                <div style="display:flex; justify-content:space-between; font-size:12px; margin-top:4px;">
+                    <span>Текущий интервал: <span id="diamondIntervalDisplay">10</span> мин</span>
+                </div>
+                <div class="shop-grid" style="margin-top:6px;" id="diamondSpeedShop"></div>
+            </div>
+        </div>
+        <!-- Бизнес -->
+        <div id="tabBusiness" class="tab">
+            <h3 style="margin-bottom:4px;font-size:15px;"><i class="fas fa-building"></i> Филиалы</h3>
+            <div class="brand-grid" id="brandGrid"></div>
+        </div>
+        <!-- Сундук -->
+        <div id="tabChest" class="tab">
+            <h3 style="margin-bottom:4px;font-size:15px;"><i class="fas fa-box"></i> Сундуки</h3>
+            <div style="background:#1a222e; border-radius:12px; padding:12px; margin-top:6px; text-align:center;">
+                <p style="font-size:13px; color:#aabaca;">Открой сундук за 5 💎 и получи от 1000 до 10000 монет!</p>
+                <button class="chest-btn" id="openChestBtn">🎁 Открыть (5 💎)</button>
+                <div id="chestResult" style="margin-top:8px; font-size:17px; font-weight:700; color:#f7b731;"></div>
+            </div>
+        </div>
+        <!-- Лидеры -->
+        <div id="tabLeaders" class="tab"><h3 style="margin-bottom:4px;font-size:15px;"><i class="fas fa-trophy"></i> Таблица лидеров</h3><div class="leaderboard-list" id="leaderList"></div></div>
+        <!-- Настройки -->
+        <div id="tabSettings" class="tab">
+            <h3 style="margin-bottom:4px;font-size:15px;"><i class="fas fa-cog"></i> Настройки</h3>
+            <div class="settings-group">
+                <label>Ваш ник: <strong id="settingsNick">Игрок</strong></label>
+                <button class="btn btn-danger" id="logoutBtn">Выйти из аккаунта</button>
+            </div>
+            <div class="settings-group">
+                <label>Админ-доступ</label>
+                <input type="password" id="adminCodeInput" placeholder="Введите код" maxlength="4">
+                <button class="btn btn-danger" id="adminUnlockBtn">Войти</button>
+            </div>
+            <div id="adminPanel">
+                <h4 style="color:#f7b731;font-size:13px;"><i class="fas fa-user-shield"></i> Админ-панель</h4>
+                <div class="admin-grid">
+                    <div class="admin-item"><label>Ник игрока</label><input type="text" id="adminNick" placeholder="Ник"></div>
+                    <div class="admin-item" style="grid-column:span 2;"><label>Монеты</label><div style="display:flex; gap:3px;"><input type="number" id="adminCoins" value="0"><button class="btn-small" id="adminSetCoins">Уст.</button><button class="btn-small" id="adminAddCoinsBtn">+</button><button class="btn-small" id="adminSubCoinsBtn">-</button></div></div>
+                    <div class="admin-item" style="grid-column:span 2;"><label>Алмазы</label><div style="display:flex; gap:3px;"><input type="number" id="adminDiamonds" value="0"><button class="btn-small" id="adminSetDiamonds">Уст.</button><button class="btn-small" id="adminAddDiamondsBtn">+</button><button class="btn-small" id="adminSubDiamondsBtn">-</button></div></div>
+                    <div class="admin-item"><label>Клик-пауэр</label><input type="number" id="adminClickPower" value="1"><button class="btn-small" data-target="clickPower">Уст.</button></div>
+                    <div class="admin-item"><label>Макс. энергия</label><input type="number" id="adminMaxEnergy" value="100"><button class="btn-small" data-target="maxEnergy">Уст.</button></div>
+                </div>
+                <button class="btn btn-danger" id="adminResetBtn" style="margin-top:6px;font-size:13px;padding:6px;">Сбросить свой прогресс</button>
+                <button class="btn btn-danger" id="adminClearLeaderboardBtn" style="margin-top:6px;font-size:13px;padding:6px;background:#e67e22;">Очистить лидерборд</button>
+            </div>
+        </div>
+    </div>
+    <div class="bottom-nav">
+        <button class="nav-item active" data-tab="tabMain"><i class="fas fa-home"></i> Главная</button>
+        <button class="nav-item" data-tab="tabShop"><i class="fas fa-store"></i> Магазин</button>
+        <button class="nav-item" data-tab="tabDiamond"><i class="fas fa-gem"></i> Алмазы</button>
+        <button class="nav-item" data-tab="tabBusiness"><i class="fas fa-building"></i> Бизнес</button>
+        <button class="nav-item" data-tab="tabChest"><i class="fas fa-box"></i> Сундук</button>
+        <button class="nav-item" data-tab="tabLeaders"><i class="fas fa-trophy"></i> Лидеры</button>
+        <button class="nav-item" data-tab="tabSettings"><i class="fas fa-cog"></i> Настройки</button>
+    </div>
+</div>
+
+<script>
+// ================================================================
+//  ПОДКЛЮЧЕНИЕ К FIREBASE
+// ================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyF53aFyEX-od8kbmNHzBTNwtpMFKdPLs",
+  authDomain: "crypto-clicker-game-d952e.firebaseapp.com",
+  databaseURL: "https://crypto-clicker-game-d952e-default-rtdb.firebaseio.com",
+  projectId: "crypto-clicker-game-d952e",
+  storageBucket: "crypto-clicker-game-d952e.firebasestorageapi",
+  messagingSenderId: "1034077574733",
+  appId: "1:1034077574733:web:c09493fcb59f72bd2c6e04",
+  measurementId: "G-0Z3ZRDQ0PD"
+};
+
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// ================================================================
+//  ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+// ================================================================
+let currentUser = null;
+let game = null;
+let isLoginMode = true;
+let leaderboardCache = null;
+let leaderboardCacheTime = 0;
+
+// ================================================================
+//  ЭКРАН ВХОДА / РЕГИСТРАЦИИ
+// ================================================================
+const authScreen = document.getElementById('authScreen');
+const appEl = document.getElementById('app');
+const authError = document.getElementById('authError');
+const authNick = document.getElementById('authNick');
+const authPass = document.getElementById('authPass');
+const authLoginBtn = document.getElementById('authLoginBtn');
+const authRegisterBtn = document.getElementById('authRegisterBtn');
+const authSwitchLink = document.getElementById('authSwitchLink');
+const authSwitchText = document.getElementById('authSwitch');
+
+function updateAuthMode() {
+    if (isLoginMode) {
+        authLoginBtn.style.display = 'block';
+        authRegisterBtn.style.display = 'none';
+        authSwitchText.innerHTML = 'Нет аккаунта? <span id="authSwitchLink">Зарегистрироваться</span>';
+        const link = document.querySelector('#authSwitchLink');
+        if (link) link.addEventListener('click', () => {
+            isLoginMode = false;
+            updateAuthMode();
+        });
+    } else {
+        authLoginBtn.style.display = 'none';
+        authRegisterBtn.style.display = 'block';
+        authSwitchText.innerHTML = 'Уже есть аккаунт? <span id="authSwitchLink">Войти</span>';
+        const link = document.querySelector('#authSwitchLink');
+        if (link) link.addEventListener('click', () => {
+            isLoginMode = true;
+            updateAuthMode();
+        });
+    }
+}
+updateAuthMode();
+
+// ================================================================
+//  ФУНКЦИИ РАБОТЫ С FIREBASE
+// ================================================================
+function loadUserData(nick) {
+    return new Promise((resolve) => {
+        database.ref('users/' + nick).once('value', snapshot => {
+            resolve(snapshot.val());
+        });
+    });
+}
+
+function saveUserData(nick, data) {
+    database.ref('users/' + nick).set(data);
+}
+
+function loadAllUsers() {
+    return new Promise((resolve) => {
+        database.ref('users').once('value', snapshot => {
+            resolve(snapshot.val() || {});
+        });
+    });
+}
+
+function clearAllUsers() {
+    return new Promise((resolve) => {
+        database.ref('users').set({}, resolve);
+    });
+}
+
+// ================================================================
+//  АВТОРИЗАЦИЯ
+// ================================================================
+authLoginBtn.addEventListener('click', async () => {
+    const nick = authNick.value.trim();
+    const pass = authPass.value.trim();
+    if (!nick || !pass) { authError.textContent = 'Заполните все поля'; return; }
+    const data = await loadUserData(nick);
+    if (!data) { authError.textContent = 'Пользователь не найден'; return; }
+    if (data.password !== pass) { authError.textContent = 'Неверный пароль'; return; }
+    authError.textContent = '';
+    currentUser = nick;
+    game = data.game || getDefaultGame();
+    resetBrands();
+    enterGame();
+});
+
+authRegisterBtn.addEventListener('click', async () => {
+    const nick = authNick.value.trim();
+    const pass = authPass.value.trim();
+    if (!nick || !pass) { authError.textContent = 'Заполните все поля'; return; }
+    if (nick.length < 3) { authError.textContent = 'Ник минимум 3 символа'; return; }
+    if (pass.length < 4) { authError.textContent = 'Пароль минимум 4 символа'; return; }
+    const existing = await loadUserData(nick);
+    if (existing) { authError.textContent = 'Этот ник уже занят'; return; }
+    authError.textContent = '';
+    const newGame = getDefaultGame();
+    resetBrands();
+    await saveUserData(nick, { password: pass, game: newGame });
+    currentUser = nick;
+    game = newGame;
+    enterGame();
+});
+
+// ================================================================
+//  ИГРОВЫЕ ФУНКЦИИ
+// ================================================================
+function getDefaultGame() {
+    return {
+        coins: 0,
+        clickPower: 1,
+        energy: 100,
+        maxEnergy: 100,
+        diamonds: 0,
+        totalClicks: 0,
+        autoLevel: 0,
+        brands: { nike: { level: 0 }, adidas: { level: 0 }, puma: { level: 0 }, reebok: { level: 0 } },
+        regenLevel: 0,
+        lastDiamondTime: Date.now(),
+        diamondSpeedLevel: 0,
+        chestOpened: 0
+    };
+}
+
+function resetBrands() {
+    if (game && game.brands) {
+        for (let b in game.brands) {
+            game.brands[b].level = 0;
+        }
+    }
+}
+
+function enterGame() {
+    authScreen.style.display = 'none';
+    appEl.style.display = 'block';
+    document.getElementById('headerNick').textContent = currentUser;
+    document.getElementById('settingsNick').textContent = currentUser;
+    initGame();
+}
+
+function saveGame() {
+    if (!currentUser) return;
+    saveUserData(currentUser, { password: '****', game: game });
+}
+
+function initGame() {
+    const def = getDefaultGame();
+    for (let key in def) {
+        if (!(key in game)) game[key] = def[key];
+    }
+    if (!game.brands) game.brands = def.brands;
+    for (let b in def.brands) {
+        if (!game.brands[b]) game.brands[b] = { level: 0 };
+    }
+    // ПРИНУДИТЕЛЬНО ОБНУЛЯЕМ БРЕНДЫ!
+    resetBrands();
+    saveGame();
+    updateUI();
+
+    // Интервалы
+    if (game.autoLevel > 0 && !window._autoInterval) {
+        window._autoInterval = setInterval(() => {
+            if (game.autoLevel > 0) {
+                const power = (game.autoLevel + 1) * 10;
+                game.coins += power;
+                saveGame();
+                updateUI();
+            }
+        }, 3000);
+    }
+    if (!window._energyInterval) {
+        window._energyInterval = setInterval(() => {
+            const regen = getRegenPerSecond() / 10;
+            if (game.energy < game.maxEnergy) {
+                game.energy = Math.min(game.maxEnergy, game.energy + regen);
+                saveGame();
+                updateUI();
+            }
+        }, 100);
+    }
+    if (!window._passiveInterval) {
+        window._passiveInterval = setInterval(() => {
+            let income = getTotalBrandIncome();
+            if (income > 0) {
+                game.coins += income;
+                saveGame();
+                updateUI();
+            }
+        }, 1000);
+    }
+    if (!window._diamondInterval) {
+        window._diamondInterval = setInterval(() => {
+            const now = Date.now();
+            const interval = getDiamondInterval() * 60 * 1000;
+            const diff = now - (game.lastDiamondTime || now);
+            if (diff >= interval) {
+                game.diamonds += 1;
+                game.lastDiamondTime = now;
+                saveGame();
+                updateUI();
+                spawnFloatText('💎 +1', { clientX: window.innerWidth-50, clientY: 50 });
+            }
+        }, 10000);
+    }
+    if (!window._diamondTimerInterval) {
+        window._diamondTimerInterval = setInterval(() => {
+            updateDiamondTimer();
+        }, 1000);
+    }
+
+    // Обработчики
+    document.getElementById('clickCoin').addEventListener('click', function(e) {
+        clickCoin(e);
+    });
+    document.querySelectorAll('.nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            this.classList.add('active');
+            const tabId = this.dataset.tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+        });
+    });
+    setupAdmin();
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    document.getElementById('openChestBtn').addEventListener('click', openChest);
+}
+
+// ================================================================
+//  ОБНОВЛЕНИЕ UI
+// ================================================================
+function updateUI() {
+    if (!game) return;
+    const coinsStr = formatNumber(game.coins);
+    const diaStr = formatNumber(game.diamonds);
+    document.getElementById('headerCoins').textContent = coinsStr;
+    document.getElementById('headerDiamonds').textContent = diaStr;
+    document.getElementById('mainCoins').textContent = coinsStr;
+    document.getElementById('mainDiamonds').textContent = diaStr;
+    const pct = (game.energy / game.maxEnergy) * 100;
+    document.getElementById('energyFill').style.width = pct + '%';
+    document.getElementById('energyLabel').textContent = Math.floor(game.energy) + ' / ' + game.maxEnergy;
+    document.getElementById('statClicks').textContent = formatNumber(game.totalClicks);
+    document.getElementById('statClickPower').textContent = formatNumber(game.clickPower);
+    document.getElementById('statMaxEnergy').textContent = game.maxEnergy;
+    const passive = getTotalBrandIncome();
+    document.getElementById('statPassive').textContent = formatNumber(passive) + '/сек';
+    renderShop();
+    renderDiamondShop();
+    renderDiamondSpeedShop();
+    renderBrands();
+    renderLeaderboard();
+    document.getElementById('adminCoins').value = game.coins;
+    document.getElementById('adminDiamonds').value = game.diamonds;
+    document.getElementById('adminClickPower').value = game.clickPower;
+    document.getElementById('adminMaxEnergy').value = game.maxEnergy;
+    document.getElementById('clickCoin').style.opacity = game.energy >= 1 ? '1' : '0.6';
+    updateDiamondTimer();
+    saveGame();
+}
+
+function formatNumber(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return Math.floor(n).toString();
+}
+
+function clickCoin(e) {
+    if (game.energy < 1) {
+        shakeElement(document.getElementById('clickCoin'));
+        return;
+    }
+    game.energy -= 1;
+    game.coins += game.clickPower;
+    game.totalClicks += 1;
+    if (Math.random() < 0.05) {
+        game.diamonds += 1;
+        spawnFloatText('💎 +1', e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+    }
+    spawnFloatText('+' + formatNumber(game.clickPower), e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+    playClickSound();
+    updateUI();
+}
+
+function shakeElement(el) {
+    el.style.animation = 'none';
+    void el.offsetHeight;
+    el.style.animation = 'shake 0.2s';
+    setTimeout(() => el.style.animation = '', 300);
+}
+
+function spawnFloatText(text, ev) {
+    const el = document.createElement('div');
+    el.className = 'float-text';
+    el.textContent = text;
+    const x = ev.clientX || window.innerWidth/2;
+    const y = ev.clientY || window.innerHeight/2 - 40;
+    el.style.left = (x - 30 + (Math.random()*40-20)) + 'px';
+    el.style.top = (y - 20) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+}
+
+let audioCtx = null;
+function playClickSound() {
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = 800 + Math.random()*200;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.07);
+        osc.start(audioCtx.currentTime);
+        osc.stop(audioCtx.currentTime + 0.07);
+    } catch(e) {}
+}
+
+// ================================================================
+//  МАГАЗИН (монеты)
+// ================================================================
+function getClickPowerCost() {
+    const level = game.clickPower - 1;
+    return Math.floor(10 * Math.pow(1.5, level));
+}
+function buyPower() {
+    const cost = getClickPowerCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.clickPower += 1;
+        updateUI();
+        playClickSound();
+    }
+}
+function getMaxEnergyCost() {
+    const level = Math.floor((game.maxEnergy - 100) / 20);
+    return Math.floor(25 * Math.pow(1.5, level));
+}
+function buyMaxEnergy() {
+    const cost = getMaxEnergyCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.maxEnergy += 20;
+        updateUI();
+        playClickSound();
+    }
+}
+function getRegenCost() {
+    return Math.floor(30 * Math.pow(1.5, game.regenLevel || 0));
+}
+function getRegenPerSecond() {
+    return 0.3 + (game.regenLevel || 0) * 0.05;
+}
+function buyRegen() {
+    const cost = getRegenCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.regenLevel = (game.regenLevel || 0) + 1;
+        updateUI();
+        playClickSound();
+    }
+}
+function renderShop() {
+    const container = document.getElementById('shopGrid');
+    container.innerHTML = '';
+    const items = [
+        { name:'Сила клика', icon:'fa-hand-fist', desc:'+1 к доходу', cost:getClickPowerCost(), level:game.clickPower-1, buy:buyPower },
+        { name:'Запас энергии', icon:'fa-battery-full', desc:'+20 к макс.', cost:getMaxEnergyCost(), level:game.maxEnergy, buy:buyMaxEnergy },
+        { name:'Регенерация', icon:'fa-bolt', desc:'+0.05/сек', cost:getRegenCost(), level:game.regenLevel||0, buy:buyRegen }
+    ];
+    items.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'shop-card' + (game.coins >= item.cost ? '' : ' disabled');
+        div.innerHTML = `
+            <div class="icon"><i class="fas ${item.icon}"></i></div>
+            <div class="name">${item.name}</div>
+            <div class="desc">${item.desc}</div>
+            <div class="price"><i class="fas fa-coins"></i> ${formatNumber(item.cost)}</div>
+            <div class="level">Уровень ${item.level}</div>
+        `;
+        if (game.coins >= item.cost) div.addEventListener('click', item.buy);
+        container.appendChild(div);
+    });
+}
+
+// ================================================================
+//  АЛМАЗНЫЙ МАГАЗИН
+// ================================================================
+function getAutoLevel() { return game.autoLevel || 0; }
+function getAutoCost() {
+    const level = getAutoLevel();
+    if (level === 0) return 5;
+    return 5 * Math.pow(2, level);
+}
+function getAutoPower() {
+    const level = getAutoLevel();
+    return (level + 1) * 10;
+}
+function buyAuto() {
+    const cost = getAutoCost();
+    if (game.diamonds >= cost && game.autoLevel < 10) {
+        game.diamonds -= cost;
+        game.autoLevel = (game.autoLevel || 0) + 1;
+        if (!window._autoInterval) {
+            window._autoInterval = setInterval(() => {
+                if (game.autoLevel > 0) {
+                    const power = getAutoPower();
+                    game.coins += power;
+                    updateUI();
+                }
+            }, 3000);
+        }
+        updateUI();
+        playClickSound();
+    }
+}
+function renderDiamondShop() {
+    const container = document.getElementById('diamondShop');
+    container.innerHTML = '';
+    const level = getAutoLevel();
+    const cost = getAutoCost();
+    const canBuy = game.diamonds >= cost && level < 10;
+    const div = document.createElement('div');
+    div.className = 'shop-card' + (canBuy ? '' : ' disabled');
+    div.innerHTML = `
+        <div class="icon"><i class="fas fa-robot"></i></div>
+        <div class="name">Мощный клик</div>
+        <div class="desc">+1 к силе клика</div>
+        <div class="price"><i class="fas fa-gem"></i> ${cost}</div>
+        <div class="level">Уровень ${level}/10</div>
+    `;
+    if (canBuy) div.addEventListener('click', buyAuto);
+    container.appendChild(div);
+}
+
+// ================================================================
+//  УСКОРЕНИЕ АЛМАЗОВ
+// ================================================================
+function getDiamondInterval() {
+    const level = game.diamondSpeedLevel || 0;
+    return Math.max(3, 10 - level);
+}
+function getDiamondSpeedCost() {
+    const level = game.diamondSpeedLevel || 0;
+    if (level === 0) return 1000000;
+    return 1000000 * Math.pow(2, level);
+}
+function buyDiamondSpeed() {
+    const level = game.diamondSpeedLevel || 0;
+    if (level >= 7) return;
+    const cost = getDiamondSpeedCost();
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.diamondSpeedLevel = level + 1;
+        updateUI();
+        playClickSound();
+    }
+}
+function renderDiamondSpeedShop() {
+    const container = document.getElementById('diamondSpeedShop');
+    container.innerHTML = '';
+    const level = game.diamondSpeedLevel || 0;
+    if (level >= 7) {
+        container.innerHTML = '<p style="color:#4fc3f7; font-size:12px; text-align:center;">✅ Максимальный уровень (3 мин)</p>';
+        return;
+    }
+    const cost = getDiamondSpeedCost();
+    const canBuy = game.coins >= cost;
+    const nextInterval = Math.max(3, 10 - (level + 1));
+    const div = document.createElement('div');
+    div.className = 'shop-card' + (canBuy ? '' : ' disabled');
+    div.innerHTML = `
+        <div class="icon"><i class="fas fa-clock"></i></div>
+        <div class="name">Ускорение</div>
+        <div class="desc">${10 - level} мин → ${nextInterval} мин</div>
+        <div class="price"><i class="fas fa-coins"></i> ${formatNumber(cost)}</div>
+        <div class="level">Уровень ${level}/7</div>
+    `;
+    if (canBuy) div.addEventListener('click', buyDiamondSpeed);
+    container.appendChild(div);
+}
+
+function updateDiamondTimer() {
+    const interval = getDiamondInterval() * 60;
+    const now = Date.now();
+    const last = game.lastDiamondTime || now;
+    const elapsed = (now - last) / 1000;
+    const remaining = Math.max(0, interval - elapsed);
+    const minutes = Math.floor(remaining / 60);
+    const seconds = Math.floor(remaining % 60);
+    document.getElementById('diamondTimer').textContent = `⏳ Следующий алмаз через: ${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    document.getElementById('diamondIntervalDisplay').textContent = getDiamondInterval();
+}
+
+// ================================================================
+//  БРЕНДЫ
+// ================================================================
+const BRAND_DATA = {
+    nike: { name:'Nike', icon:'👟', baseCost:500, baseIncome:5 },
+    adidas: { name:'Adidas', icon:'👕', baseCost:800, baseIncome:8 },
+    puma: { name:'Puma', icon:'🐆', baseCost:1200, baseIncome:12 },
+    reebok: { name:'Reebok', icon:'⚡', baseCost:1800, baseIncome:18 }
+};
+function getBrandCost(key) {
+    const level = game.brands[key].level || 0;
+    return Math.floor(BRAND_DATA[key].baseCost * Math.pow(1.5, level));
+}
+function getBrandIncome(key) {
+    const level = game.brands[key].level || 0;
+    return Math.floor(BRAND_DATA[key].baseIncome * (1 + level * 0.3));
+}
+function getTotalBrandIncome() {
+    let total = 0;
+    for (let b in game.brands) {
+        total += getBrandIncome(b);
+    }
+    return total;
+}
+function buyBrand(key) {
+    const cost = getBrandCost(key);
+    if (game.coins >= cost) {
+        game.coins -= cost;
+        game.brands[key].level = (game.brands[key].level || 0) + 1;
+        updateUI();
+        playClickSound();
+    }
+}
+function renderBrands() {
+    const container = document.getElementById('brandGrid');
+    container.innerHTML = '';
+    for (let key in BRAND_DATA) {
+        const data = BRAND_DATA[key];
+        const level = game.brands[key].level || 0;
+        const cost = getBrandCost(key);
+        const income = getBrandIncome(key);
+        const canBuy = game.coins >= cost;
+        const div = document.createElement('div');
+        div.className = 'brand-card' + (canBuy ? '' : ' disabled');
+        div.innerHTML = `
+            <div class="icon">${data.icon}</div>
+            <div class="name">${data.name}</div>
+            <div class="level">Уровень ${level}</div>
+            <div class="income">💰 ${formatNumber(income)}/сек</div>
+            <div class="price">🪙 ${formatNumber(cost)}</div>
+        `;
+        if (canBuy) div.addEventListener('click', () => buyBrand(key));
+        container.appendChild(div);
+    }
+}
+
+// ================================================================
+//  СУНДУК
+// ================================================================
+function openChest() {
+    if (game.diamonds < 5) {
+        document.getElementById('chestResult').textContent = '❌ Недостаточно алмазов!';
+        return;
+    }
+    game.diamonds -= 5;
+    const rand = Math.random();
+    let prize = 0;
+    if (rand < 0.60) prize = Math.floor(1000 + Math.random() * 1000);
+    else if (rand < 0.85) prize = Math.floor(2000 + Math.random() * 2000);
+    else if (rand < 0.95) prize = Math.floor(4000 + Math.random() * 3000);
+    else if (rand < 0.99) prize = Math.floor(7000 + Math.random() * 2000);
+    else prize = Math.floor(9000 + Math.random() * 1000);
+    game.coins += prize;
+    game.chestOpened = (game.chestOpened || 0) + 1;
+    document.getElementById('chestResult').textContent = '🎉 Вы выиграли ' + formatNumber(prize) + ' монет!';
+    updateUI();
+    playClickSound();
+}
+
+// ================================================================
+//  ЛИДЕРБОРД (с кешированием, чтобы не лагать)
+// ================================================================
+async function renderLeaderboard() {
+    const container = document.getElementById('leaderList');
+    const now = Date.now();
+    // Если прошло меньше 5 секунд с последнего обновления, используем кеш
+    if (leaderboardCache && (now - leaderboardCacheTime) < 5000) {
+        container.innerHTML = leaderboardCache;
+        return;
+    }
+    container.innerHTML = 'Загрузка...';
+    const users = await loadAllUsers();
+    const list = [];
+    for (let nick in users) {
+        if (users[nick].game) {
+            list.push({ nickname: nick, coins: users[nick].game.coins || 0 });
+        }
+    }
+    list.sort((a,b) => b.coins - a.coins);
+    const top = list.slice(0, 50);
+    let html = '';
+    if (top.length === 0) {
+        html = '<p style="text-align:center;color:#7a8a9e;font-size:13px;">Пока никого нет</p>';
+    } else {
+        top.forEach((entry, idx) => {
+            const isMe = entry.nickname === currentUser;
+            html += `
+                <div class="leader-item" style="${isMe ? 'border-left-color:#4fc3f7;' : ''}">
+                    <span class="rank">#${idx+1}</span>
+                    <span class="name">${entry.nickname} ${isMe ? '⭐' : ''}</span>
+                    <span class="score">${formatNumber(entry.coins)}</span>
+                </div>
+            `;
+        });
+    }
+    container.innerHTML = html;
+    leaderboardCache = html;
+    leaderboardCacheTime = now;
+}
+
+// ================================================================
+//  АДМИН
+// ================================================================
+let adminUnlocked = false;
+function setupAdmin() {
+    document.getElementById('adminUnlockBtn').addEventListener('click', function() {
+        const code = document.getElementById('adminCodeInput').value;
+        if (code === '0000') {
+            adminUnlocked = true;
+            document.getElementById('adminPanel').classList.add('show');
+            document.getElementById('adminCodeInput').value = '';
+            alert('Доступ получен');
+            updateUI();
+        } else {
+            alert('Неверный код');
+        }
+    });
+
+    document.getElementById('adminSetCoins').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminCoins').value);
+        if (isNaN(val) || val < 0) return;
+        game.coins = Math.floor(val);
+        updateUI();
+    });
+    document.getElementById('adminAddCoinsBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminCoins').value);
+        if (isNaN(val) || val < 0) return;
+        game.coins += Math.floor(val);
+        updateUI();
+    });
+    document.getElementById('adminSubCoinsBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminCoins').value);
+        if (isNaN(val) || val < 0) return;
+        game.coins = Math.max(0, game.coins - Math.floor(val));
+        updateUI();
+    });
+    document.getElementById('adminSetDiamonds').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminDiamonds').value);
+        if (isNaN(val) || val < 0) return;
+        game.diamonds = Math.floor(val);
+        updateUI();
+    });
+    document.getElementById('adminAddDiamondsBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminDiamonds').value);
+        if (isNaN(val) || val < 0) return;
+        game.diamonds += Math.floor(val);
+        updateUI();
+    });
+    document.getElementById('adminSubDiamondsBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminDiamonds').value);
+        if (isNaN(val) || val < 0) return;
+        game.diamonds = Math.max(0, game.diamonds - Math.floor(val));
+        updateUI();
+    });
+    document.querySelectorAll('.admin-grid .btn-small[data-target]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (!adminUnlocked) return;
+            const target = this.dataset.target;
+            const input = document.getElementById('admin' + target.charAt(0).toUpperCase() + target.slice(1));
+            let val = parseFloat(input.value);
+            if (isNaN(val)) return;
+            if (target === 'clickPower') {
+                val = Math.max(1, Math.floor(val));
+                game.clickPower = val;
+            } else if (target === 'maxEnergy') {
+                val = Math.max(10, Math.floor(val));
+                game.maxEnergy = val;
+                if (game.energy > game.maxEnergy) game.energy = game.maxEnergy;
+            }
+            updateUI();
+        });
+    });
+    document.getElementById('adminResetBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        if (confirm('Сбросить свой прогресс?')) {
+            const def = getDefaultGame();
+            for (let key in def) game[key] = def[key];
+            game.brands = def.brands;
+            resetBrands();
+            updateUI();
+            alert('Сброшено');
+        }
+    });
+    document.getElementById('adminClearLeaderboardBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        if (confirm('Удалить всех игроков из таблицы лидеров? (Ваш прогресс сохранится)')) {
+            clearAllUsers().then(() => {
+                // Сохранить текущего игрока заново
+                if (currentUser) {
+                    saveUserData(currentUser, { password: '****', game: game });
+                }
+                leaderboardCache = null;
+                updateUI();
+                alert('Лидерборд очищен');
+            });
+        }
+    });
+}
+
+// ================================================================
+//  ВЫХОД
+// ================================================================
+function logout() {
+    if (confirm('Выйти из аккаунта?')) {
+        if (window._autoInterval) clearInterval(window._autoInterval);
+        if (window._energyInterval) clearInterval(window._energyInterval);
+        if (window._passiveInterval) clearInterval(window._passiveInterval);
+        if (window._diamondInterval) clearInterval(window._diamondInterval);
+        if (window._diamondTimerInterval) clearInterval(window._diamondTimerInterval);
+        window._autoInterval = null;
+        window._energyInterval = null;
+        window._passiveInterval = null;
+        window._diamondInterval = null;
+        window._diamondTimerInterval = null;
+        currentUser = null;
+        game = null;
+        appEl.style.display = 'none';
+        authScreen.style.display = 'flex';
+        authNick.value = '';
+        authPass.value = '';
+        authError.textContent = '';
+        isLoginMode = true;
+        updateAuthMode();
+    }
+}
+
+// ================================================================
+//  АВТОВХОД
+// ================================================================
+authScreen.style.display = 'flex';
+appEl.style.display = 'none';
+
+console.log('CryptoClicker с исправленным пассивным доходом и логином загружен!');
+</script>
+</body>
+</html>

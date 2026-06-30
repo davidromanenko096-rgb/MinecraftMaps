@@ -732,3 +732,149 @@ function renderLeaderboard() {
 
 // ================================================================
 //  АДМИН
+// ================================================================
+let adminUnlocked = false;
+function setupAdmin() {
+    document.getElementById('adminUnlockBtn').addEventListener('click', function() {
+        const code = document.getElementById('adminCodeInput').value;
+        if (code === '0000') {
+            adminUnlocked = true;
+            document.getElementById('adminPanel').classList.add('show');
+            document.getElementById('adminCodeInput').value = '';
+            alert('Доступ получен');
+            updateUI();
+        } else {
+            alert('Неверный код');
+        }
+    });
+    document.getElementById('adminSetCoins').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminCoins').value);
+        if (isNaN(val) || val < 0) return;
+        game.coins = Math.floor(val);
+        updateUI();
+    });
+    document.getElementById('adminAddCoinsBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminCoins').value);
+        if (isNaN(val) || val < 0) return;
+        game.coins += Math.floor(val);
+        updateUI();
+    });
+    document.getElementById('adminSubCoinsBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminCoins').value);
+        if (isNaN(val) || val < 0) return;
+        game.coins = Math.max(0, game.coins - Math.floor(val));
+        updateUI();
+    });
+    document.getElementById('adminSetDiamonds').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminDiamonds').value);
+        if (isNaN(val) || val < 0) return;
+        game.diamonds = Math.floor(val);
+        updateUI();
+    });
+    document.getElementById('adminAddDiamondsBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminDiamonds').value);
+        if (isNaN(val) || val < 0) return;
+        game.diamonds += Math.floor(val);
+        updateUI();
+    });
+    document.getElementById('adminSubDiamondsBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        const val = parseFloat(document.getElementById('adminDiamonds').value);
+        if (isNaN(val) || val < 0) return;
+        game.diamonds = Math.max(0, game.diamonds - Math.floor(val));
+        updateUI();
+    });
+    document.querySelectorAll('.admin-grid .btn-small[data-target]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            if (!adminUnlocked) return;
+            const target = this.dataset.target;
+            const input = document.getElementById('admin' + target.charAt(0).toUpperCase() + target.slice(1));
+            let val = parseFloat(input.value);
+            if (isNaN(val)) return;
+            if (target === 'clickPower') {
+                val = Math.max(1, Math.floor(val));
+                game.clickPower = val;
+            } else if (target === 'maxEnergy') {
+                val = Math.max(10, Math.floor(val));
+                game.maxEnergy = val;
+                if (game.energy > game.maxEnergy) game.energy = game.maxEnergy;
+            }
+            updateUI();
+        });
+    });
+    document.getElementById('adminResetBtn').addEventListener('click', function() {
+        if (!adminUnlocked) return;
+        if (confirm('Сбросить свой прогресс?')) {
+            const def = getDefaultGame();
+            for (let key in def) game[key] = def[key];
+            game.brands = def.brands;
+            updateUI();
+            alert('Сброшено');
+        }
+    });
+}
+
+// ================================================================
+//  ВЫХОД
+// ================================================================
+function logout() {
+    if (confirm('Выйти из аккаунта?')) {
+        if (window._autoInterval) clearInterval(window._autoInterval);
+        if (window._energyInterval) clearInterval(window._energyInterval);
+        if (window._passiveInterval) clearInterval(window._passiveInterval);
+        if (window._diamondInterval) clearInterval(window._diamondInterval);
+        window._autoInterval = null;
+        window._energyInterval = null;
+        window._passiveInterval = null;
+        window._diamondInterval = null;
+        currentUser = null;
+        game = null;
+        appEl.style.display = 'none';
+        authScreen.style.display = 'flex';
+        authNick.value = '';
+        authPass.value = '';
+        authError.textContent = '';
+        isLoginMode = true;
+        updateAuthMode();
+        localStorage.removeItem('lastUser');
+    }
+}
+
+// ================================================================
+//  АВТОВХОД
+// ================================================================
+(function autoLogin() {
+    const savedNick = localStorage.getItem('lastUser');
+    if (savedNick) {
+        const users = loadUsers();
+        if (users[savedNick]) {
+            currentUser = savedNick;
+            game = users[savedNick].game;
+            if (game) {
+                authScreen.style.display = 'none';
+                appEl.style.display = 'block';
+                document.getElementById('headerNick').textContent = currentUser;
+                document.getElementById('settingsNick').textContent = currentUser;
+                initGame();
+                return;
+            }
+        }
+    }
+    authScreen.style.display = 'flex';
+    appEl.style.display = 'none';
+    const origEnter = enterGame;
+    enterGame = function() {
+        origEnter();
+        localStorage.setItem('lastUser', currentUser);
+    };
+})();
+
+console.log('CryptoClicker с регистрацией загружен!');
+</script>
+</body>
+</html>

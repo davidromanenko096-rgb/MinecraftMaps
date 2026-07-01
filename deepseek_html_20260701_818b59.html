@@ -1,0 +1,1782 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CryptoClicker PRO</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        /* Все стили как в предыдущей версии, плюс новые для турнира, скинов, званий, сундуков */
+        /* Добавляем стили для анимации сундука-казино */
+        .slot-machine {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 10px 0;
+            background: #1a1a2e;
+            padding: 10px;
+            border-radius: 12px;
+        }
+        .slot-reel {
+            width: 60px;
+            height: 60px;
+            background: #0b0e14;
+            border: 2px solid #f7b731;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: 700;
+            color: #f7b731;
+            transition: transform 0.3s;
+        }
+        .slot-reel.spinning {
+            animation: spin 0.1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .skin-item {
+            display: inline-block;
+            padding: 6px 12px;
+            margin: 4px;
+            border-radius: 20px;
+            background: rgba(26,34,46,0.7);
+            border: 1px solid #2a3a4a;
+            cursor: pointer;
+        }
+        .skin-item.active {
+            border-color: #f7b731;
+            background: rgba(247,183,49,0.2);
+        }
+        .title-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            margin: 2px;
+        }
+        .title-badge.legendary { background: #ffd700; color: #0b0e14; }
+        .title-badge.epic { background: #9b59b6; color: #fff; }
+        .title-badge.rare { background: #3498db; color: #fff; }
+        .title-badge.common { background: #7f8c8d; color: #fff; }
+        .tournament-coin {
+            background: radial-gradient(circle at 35% 35%, #4fc3f7, #0288d1) !important;
+            box-shadow: 0 10px 0 #01579b, 0 15px 40px rgba(0,0,0,0.8), inset 0 -10px 20px rgba(0,0,0,0.3) !important;
+        }
+        .tournament-coin::after {
+            background: radial-gradient(circle, rgba(255,255,255,0.4), transparent) !important;
+        }
+        .main-coin {
+            background: radial-gradient(circle at 35% 35%, #f7e07a, #e6a020, #b87a10) !important;
+            box-shadow: 0 10px 0 #8a5f0e, 0 15px 40px rgba(0,0,0,0.8), inset 0 -10px 20px rgba(0,0,0,0.3) !important;
+        }
+        .main-coin::after {
+            background: radial-gradient(circle, rgba(255,255,255,0.3), transparent) !important;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ЭКРАН ВХОДА (без изменений) -->
+<div id="authScreen" class="auth-screen">
+    <h2>🔐 CryptoClicker</h2>
+    <div class="error" id="authError"></div>
+    <div id="authStep1" class="step">
+        <div class="input-group">
+            <input type="text" id="authNick" placeholder="Никнейм">
+        </div>
+        <button class="btn btn-primary" id="authNextBtn">Далее</button>
+    </div>
+    <div id="authStep2" class="step hidden">
+        <div class="input-group">
+            <input type="password" id="authPass" placeholder="Пароль">
+        </div>
+        <button class="btn btn-primary" id="authLoginBtn">Войти</button>
+        <button class="btn btn-secondary" id="authBackBtn">Назад</button>
+    </div>
+</div>
+
+<!-- ОСНОВНАЯ ИГРА -->
+<div id="app" style="display:none;">
+    <div class="top-nav">
+        <div class="left">
+            <button class="nav-btn" id="topQuestsBtn"><i class="fas fa-tasks"></i><span class="badge" id="questsBadgeTop">!</span></button>
+        </div>
+        <div class="title">CryptoClicker</div>
+        <div class="right">
+            <button class="nav-btn" id="topSettingsBtn"><i class="fas fa-cog"></i></button>
+        </div>
+    </div>
+    <div class="header">
+        <div class="balance">
+            <span><i class="fas fa-coins"></i> <span id="headerCoins">0</span></span>
+            <span><i class="fas fa-gem"></i> <span id="headerDiamonds">0</span></span>
+            <span style="font-size:10px; background:transparent; border:none; padding:0;">👤 <span id="headerNick">Игрок</span></span>
+        </div>
+    </div>
+    <div class="content">
+        <!-- Главная (обычный режим) -->
+        <div id="tabMain" class="tab active">
+            <div class="click-area">
+                <div class="big-balance">
+                    <span class="coins"><i class="fas fa-coins"></i> <span id="mainCoins">0</span></span>
+                    <span class="diamonds"><i class="fas fa-gem"></i> <span id="mainDiamonds">0</span></span>
+                </div>
+                <div id="effectIndicator" class="effect-indicator" style="display:none;">⚡ Активен эффект</div>
+                <div class="diamond-timer" id="diamondTimer">⏳ Следующий алмаз через: 10:00</div>
+                <div class="click-coin main-coin" id="clickCoin"><i class="fas fa-coins"></i><i class="fas fa-bolt"></i></div>
+                <div class="energy-bar"><div class="energy-fill" id="energyFill" style="width:100%"></div></div>
+                <div class="energy-text"><span>⚡ Энергия</span><span id="energyLabel">100 / 100</span></div>
+                <div class="stats">
+                    <div class="stats-item"><div class="label">Кликов</div><div class="value" id="statClicks">0</div></div>
+                    <div class="stats-item"><div class="label">Доход за клик</div><div class="value" id="statClickPower">1</div></div>
+                    <div class="stats-item"><div class="label">Макс. энергия</div><div class="value" id="statMaxEnergy">100</div></div>
+                    <div class="stats-item"><div class="label">Доход в сек</div><div class="value blue" id="statIncomePerSec">0</div></div>
+                </div>
+            </div>
+        </div>
+        <!-- Турнирный режим (вкладка) -->
+        <div id="tabTournament" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#4fc3f7;"><i class="fas fa-trophy"></i> Турнирный режим</h3>
+            <div class="click-area">
+                <div class="big-balance">
+                    <span class="coins" style="color:#4fc3f7;"><i class="fas fa-gem" style="color:#4fc3f7;"></i> <span id="tournamentCoins">0</span></span>
+                    <span class="diamonds" style="color:#4fc3f7;"><i class="fas fa-star" style="color:#ffd700;"></i> <span id="tournamentDiamonds">0</span></span>
+                </div>
+                <div class="diamond-timer" style="color:#4fc3f7;">⏳ Следующий изумруд через: 10:00</div>
+                <div class="click-coin tournament-coin" id="tournamentClickCoin"><i class="fas fa-gem"></i><i class="fas fa-bolt"></i></div>
+                <div class="energy-bar"><div class="energy-fill" id="tournamentEnergyFill" style="width:100%"></div></div>
+                <div class="energy-text"><span>⚡ Энергия</span><span id="tournamentEnergyLabel">100 / 100</span></div>
+                <div class="stats">
+                    <div class="stats-item"><div class="label">Турнирных кликов</div><div class="value" id="statTournamentClicks">0</div></div>
+                    <div class="stats-item"><div class="label">Турнирный доход</div><div class="value blue" id="statTournamentPower">1</div></div>
+                    <div class="stats-item"><div class="label">Турнирных изумрудов</div><div class="value blue" id="statTournamentDiamonds">0</div></div>
+                    <div class="stats-item"><div class="label">Очки турнира</div><div class="value blue" id="statTournamentLB">0</div></div>
+                </div>
+            </div>
+            <div style="margin-top:8px; background:rgba(26,34,46,0.6); border-radius:10px; padding:8px;">
+                <p style="color:#4fc3f7; font-size:12px;">Турнирный лидерборд обновляется каждые 3 часа. Призы — скины и изумруды.</p>
+            </div>
+        </div>
+        <!-- Остальные вкладки: Магазин, Бизнес, Алмазы, Инвентарь, Сундук, Лидеры, Профиль, Настройки -->
+        <!-- Магазин -->
+        <div id="tabShop" class="tab"><h3 style="margin-bottom:4px;font-size:14px;color:#f7b731;"><i class="fas fa-store"></i> Магазин</h3><div class="shop-grid" id="shopGrid"></div></div>
+        <!-- Филиалы -->
+        <div id="tabBrands" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#f7b731;"><i class="fas fa-building"></i> Филиалы</h3>
+            <div class="brand-grid" id="brandGrid"></div>
+        </div>
+        <!-- Алмазный магазин -->
+        <div id="tabDiamond" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#4fc3f7;"><i class="fas fa-gem"></i> Алмазные улучшения</h3>
+            <div class="shop-grid diamond-shop" id="diamondShop"></div>
+            <div style="margin-top:8px; background:rgba(26,34,46,0.6); border-radius:10px; padding:8px; border:1px solid #2a3a4a;">
+                <h4 style="color:#4fc3f7; font-size:12px;">Ускорение алмазов</h4>
+                <div style="display:flex; justify-content:space-between; font-size:11px; margin-top:3px; color:#aabaca;">
+                    <span>Текущий интервал: <span id="diamondIntervalDisplay" style="color:#f7b731;">10</span> мин</span>
+                </div>
+                <div class="shop-grid" style="margin-top:4px;" id="diamondSpeedShop"></div>
+            </div>
+        </div>
+        <!-- Квесты -->
+        <div id="tabQuests" class="tab">
+            <h3><i class="fas fa-tasks"></i> Задания</h3>
+            <div id="questsContainer"></div>
+        </div>
+        <!-- Инвентарь (теперь со скинами) -->
+        <div id="tabInventory" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#4fc3f7;"><i class="fas fa-box"></i> Инвентарь</h3>
+            <div id="inventoryContainer"></div>
+            <div style="margin-top:8px; background:rgba(26,34,46,0.6); border-radius:10px; padding:8px;">
+                <h4 style="color:#4fc3f7; font-size:12px;">Скины</h4>
+                <div id="skinContainer"></div>
+            </div>
+        </div>
+        <!-- Сундук (обычный и скинов) -->
+        <div id="tabChest" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#f7b731;"><i class="fas fa-box"></i> Сундуки</h3>
+            <div style="background:rgba(26,34,46,0.6); border-radius:10px; padding:10px; margin-top:4px; border:1px solid #2a3a4a; text-align:center;">
+                <h4 style="color:#f7b731; font-size:13px;">Обычный сундук (10 💎)</h4>
+                <button class="chest-btn" id="openChestBtn">🎁 Открыть</button>
+                <div id="chestResult" style="margin-top:8px; font-size:16px; font-weight:700; color:#f7b731;"></div>
+                <div id="chestSlot" class="slot-machine" style="display:none;">
+                    <div class="slot-reel" id="reel1">0</div>
+                    <div class="slot-reel" id="reel2">0</div>
+                    <div class="slot-reel" id="reel3">0</div>
+                </div>
+            </div>
+            <div style="background:rgba(26,34,46,0.6); border-radius:10px; padding:10px; margin-top:8px; border:1px solid #4fc3f7; text-align:center;">
+                <h4 style="color:#4fc3f7; font-size:13px;">Сундук скинов (100 изумрудов)</h4>
+                <button class="chest-btn" id="openSkinChestBtn" style="background:#4fc3f7;">🎨 Открыть скин</button>
+                <div id="skinChestResult" style="margin-top:8px; font-size:16px; font-weight:700; color:#4fc3f7;"></div>
+                <div id="skinChestSlot" class="slot-machine" style="display:none;">
+                    <div class="slot-reel" id="skinReel1">🎨</div>
+                    <div class="slot-reel" id="skinReel2">🎨</div>
+                    <div class="slot-reel" id="skinReel3">🎨</div>
+                </div>
+            </div>
+        </div>
+        <!-- Лидеры (теперь два: обычный и турнирный) -->
+        <div id="tabLeaders" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#f7b731;"><i class="fas fa-trophy"></i> Таблица лидеров</h3>
+            <div style="display:flex; gap:8px; margin-bottom:6px;">
+                <button class="btn" id="leaderboardMainBtn" style="flex:1; background:#f7b731; color:#0b0e14;">Основной</button>
+                <button class="btn" id="leaderboardTournamentBtn" style="flex:1; background:#4fc3f7; color:#0b0e14;">Турнирный</button>
+            </div>
+            <div style="font-size:12px; color:#4fc3f7; margin-bottom:4px; display:flex; justify-content:space-between;">
+                <span>Обновление через: <span id="leaderboardTimer">02:59:59</span></span>
+                <span>Топ 50</span>
+            </div>
+            <div class="leaderboard-list" id="leaderList"></div>
+        </div>
+        <!-- Профиль (теперь со званиями и скинами) -->
+        <div id="tabProfile" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#4fc3f7;"><i class="fas fa-user"></i> Профиль</h3>
+            <div class="profile-grid">
+                <div class="profile-item"><div class="label">Игрок</div><div class="value"><i class="fas fa-user"></i> <span id="profileNick">-</span></div></div>
+                <div class="profile-item"><div class="label">Зарегистрирован</div><div class="value"><i class="fas fa-calendar"></i> <span id="profileRegistered">-</span></div></div>
+                <div class="profile-item"><div class="label">Кликов</div><div class="value"><i class="fas fa-hand-pointer"></i> <span id="profileClicks">0</span></div></div>
+                <div class="profile-item"><div class="label">Открыто сундуков</div><div class="value"><i class="fas fa-box"></i> <span id="profileChests">0</span></div></div>
+                <div class="profile-item" style="grid-column:span 2;"><div class="label">Время в игре</div><div class="value"><i class="fas fa-clock"></i> <span id="profileTime">0 мин</span></div></div>
+                <div class="profile-item" style="grid-column:span 2;"><div class="label">Выполнено квестов</div><div class="value"><i class="fas fa-tasks"></i> <span id="profileQuests">0</span></div></div>
+                <div class="profile-item" style="grid-column:span 2;"><div class="label">Зелий в инвентаре</div><div class="value"><i class="fas fa-flask"></i> <span id="profilePotions">0</span></div></div>
+                <div class="profile-item" style="grid-column:span 2;"><div class="label">Очки лидерборда</div><div class="value"><i class="fas fa-trophy"></i> <span id="profileLBScore">0</span></div></div>
+                <div class="profile-item" style="grid-column:span 2;"><div class="label">Звания</div><div class="value" id="profileTitles"><span style="font-size:12px;">нет</span></div></div>
+                <div class="profile-item" style="grid-column:span 2;"><div class="label">Активный скин</div><div class="value" id="profileActiveSkin">Стандартный</div></div>
+            </div>
+        </div>
+        <!-- Настройки (с админ-панелью) -->
+        <div id="tabSettings" class="tab">
+            <h3 style="margin-bottom:4px;font-size:14px;color:#f7b731;"><i class="fas fa-cog"></i> Настройки</h3>
+            <div class="settings-group">
+                <label>Ваш ник: <strong id="settingsNick" style="color:#f7b731;">Игрок</strong></label>
+                <button class="btn btn-danger" id="logoutBtn">Выйти из аккаунта</button>
+            </div>
+            <div class="settings-group">
+                <label>Введите код</label>
+                <input type="text" id="codeInput" placeholder="Код">
+                <button class="btn" id="codeApplyBtn">Применить</button>
+                <div id="codeMessage" style="margin-top:4px; font-size:12px; color:#aabaca;"></div>
+            </div>
+            <!-- Админ-панель (только для суперадмина) -->
+            <div id="adminPanel" style="display:none;">
+                <div class="settings-group" style="border-color:#ffd700;">
+                    <h4 style="color:#ffd700;"><i class="fas fa-crown"></i> Админ-панель</h4>
+                    <label>Ник игрока</label>
+                    <input type="text" id="adminNick" placeholder="Ник">
+                    <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
+                        <input type="number" id="adminCoins" placeholder="Монеты" style="flex:1; min-width:60px;">
+                        <button class="btn" id="adminAddCoins" style="flex:1; background:#f7b731;">+</button>
+                        <button class="btn btn-danger" id="adminSubCoins" style="flex:1;">-</button>
+                    </div>
+                    <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
+                        <input type="number" id="adminDiamonds" placeholder="Алмазы" style="flex:1; min-width:60px;">
+                        <button class="btn" id="adminAddDiamonds" style="flex:1; background:#f7b731;">+</button>
+                        <button class="btn btn-danger" id="adminSubDiamonds" style="flex:1;">-</button>
+                    </div>
+                    <div style="margin-top:6px; background:#0b0e14; border-radius:8px; padding:6px;">
+                        <h5 style="color:#f7b731; font-size:12px;">Доступные коды:</h5>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:2px; font-size:12px; color:#aabaca;">
+                            <div><span style="color:#f7b731;">0000</span> - Бесконечный клик</div>
+                            <div><span style="color:#f7b731;">0100</span> - Автокликер</div>
+                            <div><span style="color:#f7b731;">0200</span> - Удвоение дохода</div>
+                            <div><span style="color:#f7b731;">1111</span> - Бесконечная энергия</div>
+                            <div><span style="color:#f7b731;">0101</span> - 9999 монет</div>
+                            <div><span style="color:#f7b731;">0303</span> - 6666 монет</div>
+                            <div><span style="color:#f7b731;">001</span> - Удвоение дохода 30сек</div>
+                            <div><span style="color:#f7b731;">0002</span> - Удвоение дохода 30сек</div>
+                            <div><span style="color:#f7b731;">0003</span> - Удвоение дохода 30сек</div>
+                            <div><span style="color:#f7b731;">000000</span> - Синяя галочка (админ)</div>
+                            <div><span style="color:#ffd700;">611</span> - Золотая звезда (суперадмин)</div>
+                        </div>
+                    </div>
+                    <button class="btn btn-danger" id="adminResetLeaderboard" style="margin-top:6px;">Сбросить лидерборд</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Нижняя навигация (добавлена вкладка Турнир) -->
+    <div class="bottom-nav">
+        <button class="nav-item active" data-tab="tabMain"><i class="fas fa-home"></i> Главная</button>
+        <button class="nav-item" data-tab="tabTournament"><i class="fas fa-trophy" style="color:#4fc3f7;"></i> Турнир</button>
+        <button class="nav-item" data-tab="tabShop"><i class="fas fa-store"></i> Магазин</button>
+        <button class="nav-item" data-tab="tabBrands"><i class="fas fa-building"></i> Бизнес</button>
+        <button class="nav-item" data-tab="tabDiamond"><i class="fas fa-gem"></i> Алмазы</button>
+        <button class="nav-item" data-tab="tabInventory"><i class="fas fa-box"></i> Инвентарь</button>
+        <button class="nav-item" data-tab="tabChest"><i class="fas fa-box"></i> Сундук</button>
+        <button class="nav-item" data-tab="tabLeaders"><i class="fas fa-trophy"></i> Лидеры</button>
+        <button class="nav-item" data-tab="tabProfile"><i class="fas fa-user"></i> Профиль</button>
+        <button class="nav-item" data-tab="tabSettings"><i class="fas fa-cog"></i> Настройки</button>
+    </div>
+</div>
+
+<!-- Модалка профиля (без изменений) -->
+<div id="profileModal" class="profile-modal" style="display:none;">
+    <div class="modal-content">
+        <button class="close-btn" id="profileModalClose">&times;</button>
+        <h3 id="profileModalTitle">Профиль игрока</h3>
+        <div id="profileModalContent"></div>
+        <div id="profileModalActions" class="profile-actions"></div>
+    </div>
+</div>
+
+<script>
+// ================================================================
+//  ПОДКЛЮЧЕНИЕ К FIREBASE
+// ================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyF53aFyEX-od8kbmNHzBTNwtpMFKdPLs",
+  authDomain: "crypto-clicker-game-d952e.firebaseapp.com",
+  databaseURL: "https://crypto-clicker-game-d952e-default-rtdb.firebaseio.com",
+  projectId: "crypto-clicker-game-d952e",
+  storageBucket: "crypto-clicker-game-d952e.firebasestorageapi",
+  messagingSenderId: "1034077574733",
+  appId: "1:1034077574733:web:c09493fcb59f72bd2c6e04",
+  measurementId: "G-0Z3ZRDQ0PD"
+};
+
+firebase.initializeApp(firebaseConfig);
+const database = firebase.database();
+
+// ================================================================
+//  ГЛОБАЛЬНЫЕ ПЕРЕМЕННЫЕ
+// ================================================================
+let currentUser = null;
+let game = null;
+let leaderboardCache = null;
+let leaderboardCacheTime = 0;
+let activeEffect = null;
+let usedCodes = {};
+let isSuperAdmin = false;
+let isAdmin = false;
+let tournamentMode = false; // для переключения интерфейса
+
+// ================================================================
+//  АВТОРИЗАЦИЯ (без изменений)
+// ================================================================
+const authScreen = document.getElementById('authScreen');
+const appEl = document.getElementById('app');
+const authError = document.getElementById('authError');
+const authNick = document.getElementById('authNick');
+const authPass = document.getElementById('authPass');
+const authNextBtn = document.getElementById('authNextBtn');
+const authLoginBtn = document.getElementById('authLoginBtn');
+const authBackBtn = document.getElementById('authBackBtn');
+const authStep1 = document.getElementById('authStep1');
+const authStep2 = document.getElementById('authStep2');
+let currentNick = '';
+
+authNextBtn.addEventListener('click', () => {
+    const nick = authNick.value.trim();
+    if (nick.length < 3) { authError.textContent = 'Ник минимум 3 символа'; return; }
+    currentNick = nick;
+    authError.textContent = '';
+    authStep1.classList.add('hidden');
+    authStep2.classList.remove('hidden');
+    authPass.value = '';
+    authPass.focus();
+});
+
+authBackBtn.addEventListener('click', () => {
+    authStep2.classList.add('hidden');
+    authStep1.classList.remove('hidden');
+});
+
+authLoginBtn.addEventListener('click', async () => {
+    const pass = authPass.value.trim();
+    if (!pass) { authError.textContent = 'Введите пароль'; return; }
+    const data = await loadUserData(currentNick);
+    if (!data) {
+        const newGame = getDefaultGame();
+        await saveUserData(currentNick, { password: pass, game: newGame, admin: false, superadmin: false, usedCodes: {} });
+        currentUser = currentNick;
+        game = newGame;
+        usedCodes = {};
+        authError.textContent = '';
+        enterGame();
+        return;
+    }
+    if (data.password === pass) {
+        authError.textContent = '';
+        currentUser = currentNick;
+        game = data.game || getDefaultGame();
+        usedCodes = data.usedCodes || {};
+        isAdmin = data.admin || false;
+        isSuperAdmin = data.superadmin || false;
+        if (!game.brands) game.brands = getDefaultGame().brands;
+        if (!game.inventory) game.inventory = { potions: [], skins: [], activeSkin: null };
+        if (!game.questProgress) game.questProgress = { clicks: 0, coins: 0, brands: 0, brands_level: 0 };
+        if (!game.titles) game.titles = [];
+        if (!game.tournament) game.tournament = getDefaultTournament();
+        enterGame();
+    } else {
+        authError.textContent = 'Неверный пароль';
+    }
+});
+
+// ================================================================
+//  ФУНКЦИИ РАБОТЫ С FIREBASE
+// ================================================================
+function loadUserData(nick) {
+    return new Promise((resolve) => {
+        database.ref('users/' + nick).once('value', snapshot => {
+            resolve(snapshot.val());
+        });
+    });
+}
+
+function saveUserData(nick, data) {
+    database.ref('users/' + nick).set(data);
+}
+
+function loadAllUsers() {
+    return new Promise((resolve) => {
+        database.ref('users').once('value', snapshot => {
+            resolve(snapshot.val() || {});
+        });
+    });
+}
+
+function getLeaderboardResetTime() {
+    return new Promise((resolve) => {
+        database.ref('leaderboard/resetTime').once('value', snapshot => {
+            resolve(snapshot.val() || Date.now());
+        });
+    });
+}
+
+function setLeaderboardResetTime(time) {
+    database.ref('leaderboard/resetTime').set(time);
+}
+
+// ================================================================
+//  ДЕФОЛТНЫЕ СОСТОЯНИЯ
+// ================================================================
+function getDefaultGame() {
+    return {
+        coins: 0,
+        clickPower: 1,
+        energy: 100,
+        maxEnergy: 100,
+        diamonds: 0,
+        totalClicks: 0,
+        incomeLevel: 0,
+        incomeBonus: 0,
+        diamondAutoLevel: 0,
+        diamondIncomeLevel: 0,
+        diamondSpeedLevel: 0,
+        regenLevel: 0,
+        lastDiamondTime: Date.now(),
+        chestOpened: 0,
+        registeredAt: Date.now(),
+        inventory: { potions: [], skins: [], activeSkin: null },
+        questProgress: { clicks: 0, coins: 0, brands: 0, brands_level: 0 },
+        titles: [],
+        lbScore: 0,
+        tournament: {
+            coins: 0,
+            diamonds: 0, // изумруды
+            clickPower: 1,
+            energy: 100,
+            maxEnergy: 100,
+            totalClicks: 0,
+            lastDiamondTime: Date.now(),
+            lbScore: 0
+        },
+        brands: {
+            cola: { level: 0, income: 0 },
+            fanta: { level: 0, income: 0 },
+            lipton: { level: 0, income: 0 },
+            pepsi: { level: 0, income: 0 },
+            sprite: { level: 0, income: 0 },
+            chips: { level: 0, income: 0 },
+            banana: { level: 0, income: 0 },
+            mcdonalds: { level: 0, income: 0 },
+            burgerking: { level: 0, income: 0 },
+            fila: { level: 0, income: 0 },
+            nike: { level: 0, income: 0 },
+            shawarma: { level: 0, income: 0 }
+        }
+    };
+}
+
+function getDefaultTournament() {
+    return {
+        coins: 0,
+        diamonds: 0,
+        clickPower: 1,
+        energy: 100,
+        maxEnergy: 100,
+        totalClicks: 0,
+        lastDiamondTime: Date.now(),
+        lbScore: 0
+    };
+}
+
+function enterGame() {
+    authScreen.style.display = 'none';
+    appEl.style.display = 'flex';
+    appEl.style.flexDirection = 'column';
+    document.getElementById('headerNick').textContent = currentUser;
+    document.getElementById('settingsNick').textContent = currentUser;
+    updateProfile();
+    initGame();
+    if (isSuperAdmin) {
+        document.getElementById('adminPanel').style.display = 'block';
+    }
+}
+
+function saveGame() {
+    if (!currentUser) return;
+    loadUserData(currentUser).then(data => {
+        const pass = data ? data.password : '****';
+        const admin = data ? data.admin : false;
+        const superadmin = data ? data.superadmin : false;
+        saveUserData(currentUser, { password: pass, game: game, admin: admin, superadmin: superadmin, usedCodes: usedCodes });
+    });
+}
+
+function initGame() {
+    const def = getDefaultGame();
+    for (let key in def) {
+        if (!(key in game)) game[key] = def[key];
+    }
+    if (!game.brands) game.brands = def.brands;
+    for (let b in def.brands) {
+        if (!game.brands[b]) game.brands[b] = { level: 0, income: 0 };
+    }
+    if (!game.inventory) game.inventory = { potions: [], skins: [], activeSkin: null };
+    if (!game.questProgress) game.questProgress = { clicks: 0, coins: 0, brands: 0, brands_level: 0 };
+    if (!game.titles) game.titles = [];
+    if (!game.tournament) game.tournament = getDefaultTournament();
+    updateBrandIncomes();
+    saveGame();
+    updateUI();
+
+    // Интервалы
+    if (!window._incomeInterval) {
+        window._incomeInterval = setInterval(() => {
+            let totalIncome = (game.incomeLevel * 10) + (game.incomeBonus || 0);
+            for (let b in game.brands) {
+                totalIncome += game.brands[b].income || 0;
+            }
+            if (totalIncome > 0) {
+                game.coins += totalIncome;
+                saveGame();
+                updateUI();
+            }
+        }, 1000);
+    }
+    if (!window._energyInterval) {
+        window._energyInterval = setInterval(() => {
+            const regen = getRegenPerSecond() / 10;
+            if (game.energy < game.maxEnergy) {
+                game.energy = Math.min(game.maxEnergy, game.energy + regen);
+                saveGame();
+                updateUI();
+            }
+        }, 100);
+    }
+    if (!window._diamondInterval) {
+        window._diamondInterval = setInterval(() => {
+            const now = Date.now();
+            const interval = getDiamondInterval() * 60 * 1000;
+            const diff = now - (game.lastDiamondTime || now);
+            if (diff >= interval) {
+                game.diamonds += 1;
+                game.lastDiamondTime = now;
+                saveGame();
+                updateUI();
+                spawnFloatText('💎 +1', { clientX: window.innerWidth-50, clientY: 50 });
+            }
+        }, 10000);
+    }
+    if (!window._tournamentDiamondInterval) {
+        window._tournamentDiamondInterval = setInterval(() => {
+            const now = Date.now();
+            const interval = 10 * 60 * 1000; // 10 минут
+            const diff = now - (game.tournament.lastDiamondTime || now);
+            if (diff >= interval) {
+                game.tournament.diamonds += 1;
+                game.tournament.lastDiamondTime = now;
+                saveGame();
+                updateUI();
+                spawnFloatText('💎 Турнир +1', { clientX: window.innerWidth-50, clientY: 80 });
+            }
+        }, 10000);
+    }
+    if (!window._diamondTimerInterval) {
+        window._diamondTimerInterval = setInterval(() => {
+            updateDiamondTimer();
+        }, 1000);
+    }
+    if (!window._leaderboardTimer) {
+        window._leaderboardTimer = setInterval(() => {
+            updateLeaderboardTimer();
+        }, 1000);
+    }
+    // Проверка квестов
+    checkQuests();
+
+    // Обработчики
+    document.getElementById('clickCoin').addEventListener('click', function(e) {
+        clickCoin(e, false);
+    });
+    document.getElementById('tournamentClickCoin').addEventListener('click', function(e) {
+        clickCoin(e, true);
+    });
+    document.querySelectorAll('.bottom-nav .nav-item').forEach(item => {
+        item.addEventListener('click', function() {
+            document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+            this.classList.add('active');
+            const tabId = this.dataset.tab;
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.getElementById(tabId).classList.add('active');
+            if (tabId === 'tabQuests') renderQuests();
+            if (tabId === 'tabLeaders') renderLeaderboard();
+            if (tabId === 'tabInventory') renderInventory();
+            if (tabId === 'tabTournament') updateTournamentUI();
+        });
+    });
+    document.getElementById('topQuestsBtn').addEventListener('click', function() {
+        document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('tabQuests').classList.add('active');
+        renderQuests();
+    });
+    document.getElementById('topSettingsBtn').addEventListener('click', function() {
+        document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.getElementById('tabSettings').classList.add('active');
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    document.getElementById('openChestBtn').addEventListener('click', openChest);
+    document.getElementById('openSkinChestBtn').addEventListener('click', openSkinChest);
+    document.getElementById('codeApplyBtn').addEventListener('click', applyCode);
+    // Админ-кнопки
+    document.getElementById('adminAddCoins').addEventListener('click', async function() {
+        const nick = document.getElementById('adminNick').value.trim();
+        const val = parseFloat(document.getElementById('adminCoins').value);
+        if (!nick || isNaN(val) || val <= 0) return;
+        const data = await loadUserData(nick);
+        if (!data) { alert('Игрок не найден'); return; }
+        data.game.coins = (data.game.coins || 0) + Math.floor(val);
+        await saveUserData(nick, data);
+        alert(`Добавлено ${Math.floor(val)} монет игроку ${nick}`);
+        leaderboardCache = null;
+        updateUI();
+    });
+    document.getElementById('adminSubCoins').addEventListener('click', async function() {
+        const nick = document.getElementById('adminNick').value.trim();
+        const val = parseFloat(document.getElementById('adminCoins').value);
+        if (!nick || isNaN(val) || val <= 0) return;
+        const data = await loadUserData(nick);
+        if (!data) { alert('Игрок не найден'); return; }
+        data.game.coins = Math.max(0, (data.game.coins || 0) - Math.floor(val));
+        await saveUserData(nick, data);
+        alert(`Убавлено ${Math.floor(val)} монет у игрока ${nick}`);
+        leaderboardCache = null;
+        updateUI();
+    });
+    document.getElementById('adminAddDiamonds').addEventListener('click', async function() {
+        const nick = document.getElementById('adminNick').value.trim();
+        const val = parseFloat(document.getElementById('adminDiamonds').value);
+        if (!nick || isNaN(val) || val <= 0) return;
+        const data = await loadUserData(nick);
+        if (!data) { alert('Игрок не найден'); return; }
+        data.game.diamonds = (data.game.diamonds || 0) + Math.floor(val);
+        await saveUserData(nick, data);
+        alert(`Добавлено ${Math.floor(val)} алмазов игроку ${nick}`);
+        leaderboardCache = null;
+        updateUI();
+    });
+    document.getElementById('adminSubDiamonds').addEventListener('click', async function() {
+        const nick = document.getElementById('adminNick').value.trim();
+        const val = parseFloat(document.getElementById('adminDiamonds').value);
+        if (!nick || isNaN(val) || val <= 0) return;
+        const data = await loadUserData(nick);
+        if (!data) { alert('Игрок не найден'); return; }
+        data.game.diamonds = Math.max(0, (data.game.diamonds || 0) - Math.floor(val));
+        await saveUserData(nick, data);
+        alert(`Убавлено ${Math.floor(val)} алмазов у игрока ${nick}`);
+        leaderboardCache = null;
+        updateUI();
+    });
+    document.getElementById('adminResetLeaderboard').addEventListener('click', async function() {
+        if (!confirm('Сбросить лидерборд сейчас? Это начнёт новый цикл.')) return;
+        await resetLeaderboardNow();
+        alert('Лидерборд сброшен');
+    });
+
+    // Переключение между лидербордами
+    document.getElementById('leaderboardMainBtn').addEventListener('click', function() {
+        renderLeaderboard('main');
+    });
+    document.getElementById('leaderboardTournamentBtn').addEventListener('click', function() {
+        renderLeaderboard('tournament');
+    });
+
+    // Инициализация турнирного UI
+    updateTournamentUI();
+}
+
+// ================================================================
+//  ОБНОВЛЕНИЕ ТУРНИРНОГО UI
+// ================================================================
+function updateTournamentUI() {
+    const t = game.tournament;
+    document.getElementById('tournamentCoins').textContent = formatNumber(t.coins);
+    document.getElementById('tournamentDiamonds').textContent = formatNumber(t.diamonds);
+    document.getElementById('statTournamentClicks').textContent = formatNumber(t.totalClicks);
+    document.getElementById('statTournamentPower').textContent = formatNumber(t.clickPower);
+    document.getElementById('statTournamentDiamonds').textContent = formatNumber(t.diamonds);
+    document.getElementById('statTournamentLB').textContent = formatNumber(t.lbScore);
+    const pct = (t.energy / t.maxEnergy) * 100;
+    document.getElementById('tournamentEnergyFill').style.width = pct + '%';
+    document.getElementById('tournamentEnergyLabel').textContent = Math.floor(t.energy) + ' / ' + t.maxEnergy;
+}
+
+// ================================================================
+//  ФИЛИАЛЫ (обновлённые данные)
+// ================================================================
+function updateBrandIncomes() {
+    const brands = game.brands;
+    // Cola
+    brands.cola.income = [0, 300, 380, 490, 620, 780][brands.cola.level || 0] || 0;
+    // Fanta (уменьшено до 600 на 5 уровне)
+    brands.fanta.income = [0, 599, 700, 800, 900, 600][brands.fanta.level || 0] || 0;
+    // Lipton
+    brands.lipton.income = [0, 200, 250, 300, 380, 468][brands.lipton.level || 0] || 0;
+    // Pepsi
+    brands.pepsi.income = [0, 50, 80, 120, 180, 260][brands.pepsi.level || 0] || 0;
+    // Sprite (уменьшено)
+    brands.sprite.income = [0, 400, 500, 600, 700, 800][brands.sprite.level || 0] || 0;
+    // Chips
+    brands.chips.income = [0, 100, 130, 170, 200, 220][brands.chips.level || 0] || 0;
+    // Banana
+    brands.banana.income = [0, 50, 80, 120, 180, 280][brands.banana.level || 0] || 0;
+    // McDonald's
+    brands.mcdonalds.income = [0, 50, 70, 95, 125, 159][brands.mcdonalds.level || 0] || 0;
+    // Burger King
+    brands.burgerking.income = [0, 50, 70, 95, 125, 159][brands.burgerking.level || 0] || 0;
+    // Fila
+    brands.fila.income = [0, 30, 50, 75, 100, 130][brands.fila.level || 0] || 0;
+    // Nike (новый баланс: 500→1200)
+    brands.nike.income = [0, 500, 650, 800, 1000, 1200][brands.nike.level || 0] || 0;
+    // Shawarma (новый филиал)
+    brands.shawarma.income = [0, 80, 120, 180, 230, 280][brands.shawarma.level || 0] || 0;
+}
+
+function getBrandPrice(brandKey) {
+    const level = game.brands[brandKey].level || 0;
+    if (level >= 5) return Infinity;
+    const basePrices = {
+        cola: 13000,
+        fanta: 80000,
+        lipton: 45000,
+        pepsi: 5000,
+        sprite: 100000,
+        chips: 20000,
+        banana: 40000,
+        mcdonalds: 55000,
+        burgerking: 55000,
+        fila: 100000,
+        nike: 3300000,
+        shawarma: 120000
+    };
+    const coef = (brandKey === 'nike') ? 1.25 : 1.15;
+    return Math.floor(basePrices[brandKey] * Math.pow(coef, level));
+}
+
+function buyBrand(brandKey) {
+    const price = getBrandPrice(brandKey);
+    if (game.coins >= price && game.brands[brandKey].level < 5) {
+        game.coins -= price;
+        game.brands[brandKey].level = (game.brands[brandKey].level || 0) + 1;
+        updateBrandIncomes();
+        playPurchaseSound();
+        updateUI();
+    }
+}
+
+function renderBrands() {
+    const container = document.getElementById('brandGrid');
+    container.innerHTML = '';
+    const brandData = {
+        cola: { name: 'Coca-Cola', icon: '🥤' },
+        fanta: { name: 'Fanta', icon: '🍊' },
+        lipton: { name: 'Lipton', icon: '🍵' },
+        pepsi: { name: 'Pepsi', icon: '🥤' },
+        sprite: { name: 'Sprite', icon: '🥤' },
+        chips: { name: 'Чипсы', icon: '🍟' },
+        banana: { name: 'Бананы', icon: '🍌' },
+        mcdonalds: { name: "McDonald's", icon: '🍔' },
+        burgerking: { name: 'Burger King', icon: '👑' },
+        fila: { name: 'Fila', icon: '👟' },
+        nike: { name: 'Nike', icon: '🏃' },
+        shawarma: { name: 'Шаурмечная', icon: '🌯' }
+    };
+    for (let key in brandData) {
+        const data = brandData[key];
+        const level = game.brands[key].level || 0;
+        const income = game.brands[key].income || 0;
+        const price = getBrandPrice(key);
+        const canBuy = game.coins >= price && level < 5;
+        const div = document.createElement('div');
+        div.className = 'brand-card' + (canBuy ? '' : ' disabled');
+        div.innerHTML = `
+            <div class="icon">${data.icon}</div>
+            <div class="name">${data.name}</div>
+            <div class="level">Уровень ${level}/5</div>
+            <div class="income">💰 ${formatNumber(income)}/сек</div>
+            <div class="price">🪙 ${formatNumber(price)}</div>
+        `;
+        if (canBuy) div.addEventListener('click', () => buyBrand(key));
+        container.appendChild(div);
+    }
+}
+
+// ================================================================
+//  КВЕСТЫ (с выдачей званий)
+// ================================================================
+const questChains = {
+    clicks: {
+        name: 'Клики',
+        icon: '🖱️',
+        quests: [
+            { target: 100, reward: 1 },
+            { target: 250, reward: 1 },
+            { target: 500, reward: 2 },
+            { target: 1000, reward: 2 },
+            { target: 2000, reward: 3 },
+            { target: 5000, reward: 3 },
+            { target: 10000, reward: 5 },
+            { target: 50000, reward: 10 },
+            { target: 100000, reward: 15, title: 'Мастер кликов' },
+            { target: 500000, reward: 20, title: 'Легенда кликов' },
+            { target: 1000000, reward: 30, title: 'Бог кликов' }
+        ]
+    },
+    coins: {
+        name: 'Монеты',
+        icon: '🪙',
+        quests: [
+            { target: 1000, reward: 1 },
+            { target: 5000, reward: 2 },
+            { target: 10000, reward: 3 },
+            { target: 50000, reward: 5 },
+            { target: 100000, reward: 8 },
+            { target: 500000, reward: 12, title: 'Миллионер' },
+            { target: 1000000, reward: 20, title: 'Магнат' }
+        ]
+    },
+    brands: {
+        name: 'Купить филиалы',
+        icon: '🏢',
+        quests: [
+            { target: 1, reward: 10 },
+            { target: 2, reward: 15 },
+            { target: 3, reward: 20 },
+            { target: 4, reward: 25 },
+            { target: 5, reward: 30 },
+            { target: 6, reward: 35 },
+            { target: 7, reward: 40 },
+            { target: 8, reward: 45 },
+            { target: 9, reward: 50 },
+            { target: 10, reward: 55 },
+            { target: 11, reward: 60, title: 'Бизнес-магнат' },
+            { target: 12, reward: 70, title: 'Олигарх' }
+        ]
+    },
+    brands_level: {
+        name: 'Прокачка филиалов (уровни)',
+        icon: '📈',
+        quests: [
+            { target: 2, reward: 20, desc: 'Все филиалы на 2 уровне' },
+            { target: 3, reward: 25, desc: 'Все филиалы на 3 уровне' },
+            { target: 4, reward: 30, desc: 'Все филиалы на 4 уровне' },
+            { target: 5, reward: 40, desc: 'Все филиалы на 5 уровне', title: 'Империя' }
+        ]
+    }
+};
+
+function checkQuests() {
+    let anyAvailable = false;
+    for (let chain in questChains) {
+        const progress = game.questProgress[chain] || 0;
+        const chainData = questChains[chain];
+        if (progress < chainData.quests.length) {
+            const quest = chainData.quests[progress];
+            let currentValue = 0;
+            if (chain === 'clicks') currentValue = game.totalClicks || 0;
+            else if (chain === 'coins') currentValue = game.coins || 0;
+            else if (chain === 'brands') {
+                let count = 0;
+                for (let b in game.brands) {
+                    if ((game.brands[b].level || 0) > 0) count++;
+                }
+                currentValue = count;
+            } else if (chain === 'brands_level') {
+                let minLevel = 99;
+                for (let b in game.brands) {
+                    const lvl = game.brands[b].level || 0;
+                    if (lvl < minLevel) minLevel = lvl;
+                }
+                currentValue = minLevel;
+            }
+            if (currentValue >= quest.target) anyAvailable = true;
+        }
+    }
+    const badge = document.getElementById('questsBadgeTop');
+    if (anyAvailable) badge.classList.add('show');
+    else badge.classList.remove('show');
+}
+
+function renderQuests() {
+    const container = document.getElementById('questsContainer');
+    container.innerHTML = '';
+    let hasAvailable = false;
+
+    for (let chain in questChains) {
+        const chainData = questChains[chain];
+        const progress = game.questProgress[chain] || 0;
+        if (progress >= chainData.quests.length) {
+            const div = document.createElement('div');
+            div.className = 'quest-item completed';
+            div.innerHTML = `
+                <div class="info">
+                    <div class="name">${chainData.icon} ${chainData.name}</div>
+                    <div class="desc">✅ Все задания выполнены!</div>
+                </div>
+                <div class="reward">🏆</div>
+            `;
+            container.appendChild(div);
+            continue;
+        }
+        const quest = chainData.quests[progress];
+        let currentValue = 0;
+        let target = quest.target;
+        let desc = quest.desc || '';
+        if (chain === 'clicks') {
+            currentValue = game.totalClicks || 0;
+            desc = `Клики: ${formatNumber(currentValue)} / ${formatNumber(target)}`;
+        } else if (chain === 'coins') {
+            currentValue = game.coins || 0;
+            desc = `Монеты: ${formatNumber(currentValue)} / ${formatNumber(target)}`;
+        } else if (chain === 'brands') {
+            let count = 0;
+            for (let b in game.brands) {
+                if ((game.brands[b].level || 0) > 0) count++;
+            }
+            currentValue = count;
+            desc = `Куплено филиалов: ${currentValue} / ${target}`;
+        } else if (chain === 'brands_level') {
+            let minLevel = 99;
+            for (let b in game.brands) {
+                const lvl = game.brands[b].level || 0;
+                if (lvl < minLevel) minLevel = lvl;
+            }
+            currentValue = minLevel;
+            desc = `Все филиалы минимум ${target} уровня (сейчас ${minLevel})`;
+        }
+        const completed = currentValue >= target;
+        if (completed) hasAvailable = true;
+
+        const div = document.createElement('div');
+        div.className = 'quest-item' + (completed ? '' : '');
+        div.innerHTML = `
+            <div class="info">
+                <div class="name">${chainData.icon} ${chainData.name}</div>
+                <div class="desc">${desc}</div>
+            </div>
+            <div class="reward">💎 +${quest.reward}</div>
+            ${completed ? `<button class="btn-claim" data-chain="${chain}">Забрать</button>` : `<button class="btn-claim" disabled>Не выполнено</button>`}
+        `;
+        container.appendChild(div);
+    }
+
+    container.querySelectorAll('.btn-claim[data-chain]').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const chain = this.dataset.chain;
+            const idx = game.questProgress[chain] || 0;
+            const chainData2 = questChains[chain];
+            if (idx >= chainData2.quests.length) return;
+            const quest2 = chainData2.quests[idx];
+            let currentValue2 = 0;
+            if (chain === 'clicks') currentValue2 = game.totalClicks || 0;
+            else if (chain === 'coins') currentValue2 = game.coins || 0;
+            else if (chain === 'brands') {
+                let count = 0;
+                for (let b in game.brands) {
+                    if ((game.brands[b].level || 0) > 0) count++;
+                }
+                currentValue2 = count;
+            } else if (chain === 'brands_level') {
+                let minLevel = 99;
+                for (let b in game.brands) {
+                    const lvl = game.brands[b].level || 0;
+                    if (lvl < minLevel) minLevel = lvl;
+                }
+                currentValue2 = minLevel;
+            }
+            if (currentValue2 >= quest2.target) {
+                game.diamonds += quest2.reward;
+                game.questProgress[chain] = (game.questProgress[chain] || 0) + 1;
+                // Проверяем, есть ли звание
+                if (quest2.title && !game.titles.includes(quest2.title)) {
+                    game.titles.push(quest2.title);
+                    spawnFloatText('🏅 Получено звание: ' + quest2.title, { clientX: window.innerWidth/2, clientY: 100 });
+                }
+                saveGame();
+                updateUI();
+                renderQuests();
+                playPurchaseSound();
+                spawnFloatText('✅ Награда получена!', { clientX: window.innerWidth/2, clientY: 100 });
+                checkQuests();
+            }
+        });
+    });
+
+    const badge = document.getElementById('questsBadgeTop');
+    if (hasAvailable) badge.classList.add('show');
+    else badge.classList.remove('show');
+}
+
+// ================================================================
+//  СКИНЫ
+// ================================================================
+const SKINS = [
+    { id: 'standard', name: 'Стандартный', color: '#f7d875', sound: 'default', icon: '🪙', rarity: 'common' },
+    { id: 'lunar', name: 'Лунный', color: '#c0c0c0', sound: 'lunar', icon: '🌙', rarity: 'rare' },
+    { id: 'fire', name: 'Огненный', color: '#ff5722', sound: 'fire', icon: '🔥', rarity: 'rare' },
+    { id: 'ice', name: 'Ледяной', color: '#00bcd4', sound: 'ice', icon: '❄️', rarity: 'epic' },
+    { id: 'golden', name: 'Золотой', color: '#ffd700', sound: 'golden', icon: '✨', rarity: 'legendary' }
+];
+
+function applySkin(skinId) {
+    if (!game.inventory.skins.includes(skinId)) return;
+    game.inventory.activeSkin = skinId;
+    const skin = SKINS.find(s => s.id === skinId);
+    if (skin) {
+        const coin = document.getElementById('clickCoin');
+        coin.style.background = `radial-gradient(circle at 35% 35%, ${skin.color}, #b87a10)`;
+        // Меняем звук (упрощённо, просто меняем частоту)
+        if (skin.sound === 'lunar') audioFrequency = 800;
+        else if (skin.sound === 'fire') audioFrequency = 600;
+        else if (skin.sound === 'ice') audioFrequency = 1000;
+        else if (skin.sound === 'golden') audioFrequency = 1200;
+        else audioFrequency = 700;
+    }
+    saveGame();
+    updateUI();
+    renderInventory();
+}
+
+// ================================================================
+//  ИНВЕНТАРЬ (со скинами)
+// ================================================================
+function renderInventory() {
+    // Зелья
+    const container = document.getElementById('inventoryContainer');
+    container.innerHTML = '';
+    if (!game.inventory || game.inventory.potions.length === 0) {
+        container.innerHTML = '<p style="color:#7a8a9e; text-align:center; font-size:13px;">Инвентарь пуст</p>';
+    } else {
+        const potionNames = {
+            infinite_clicks: 'Бесконечный клик (1 мин)',
+            auto_clicker: 'Автокликер (20 сек)',
+            double_income: 'Удвоение дохода (30 сек)',
+            infinite_energy: 'Бесконечная энергия (1 мин)'
+        };
+        for (let p of game.inventory.potions) {
+            if (p.count <= 0) continue;
+            const div = document.createElement('div');
+            div.className = 'inventory-item';
+            div.innerHTML = `
+                <span class="name">${potionNames[p.id] || p.id}</span>
+                <span class="count">×${p.count}</span>
+                <button class="btn-use" data-id="${p.id}">Использовать</button>
+            `;
+            container.appendChild(div);
+        }
+        container.querySelectorAll('.btn-use').forEach(btn => {
+            btn.addEventListener('click', function() {
+                usePotion(this.dataset.id);
+            });
+        });
+    }
+
+    // Скины
+    const skinContainer = document.getElementById('skinContainer');
+    skinContainer.innerHTML = '';
+    const owned = game.inventory.skins || [];
+    const active = game.inventory.activeSkin || 'standard';
+    SKINS.forEach(skin => {
+        const has = owned.includes(skin.id) || skin.id === 'standard';
+        const div = document.createElement('div');
+        div.className = 'skin-item' + (active === skin.id ? ' active' : '');
+        div.innerHTML = `${skin.icon} ${skin.name} ${has ? (active === skin.id ? '✅' : '') : '🔒'}`;
+        if (has && skin.id !== 'standard') {
+            div.style.cursor = 'pointer';
+            div.addEventListener('click', () => applySkin(skin.id));
+        }
+        skinContainer.appendChild(div);
+    });
+}
+
+// ================================================================
+//  СУНДУК-КАЗИНО
+// ================================================================
+function openChest() {
+    if (game.diamonds < 10) {
+        document.getElementById('chestResult').textContent = '❌ Недостаточно алмазов!';
+        return;
+    }
+    game.diamonds -= 10;
+    // Анимация слота
+    const slot = document.getElementById('chestSlot');
+    slot.style.display = 'flex';
+    const reels = [document.getElementById('reel1'), document.getElementById('reel2'), document.getElementById('reel3')];
+    reels.forEach(reel => reel.classList.add('spinning'));
+    // Случайный выигрыш
+    setTimeout(() => {
+        const prize = Math.floor(Math.random() * 18000) + 2000;
+        reels.forEach(reel => {
+            reel.classList.remove('spinning');
+            reel.textContent = Math.floor(Math.random() * 10000);
+        });
+        game.coins += prize;
+        game.chestOpened = (game.chestOpened || 0) + 1;
+        document.getElementById('chestResult').textContent = '🎉 Вы выиграли ' + formatNumber(prize) + ' монет!';
+        saveGame();
+        updateUI();
+        playPurchaseSound();
+        setTimeout(() => { slot.style.display = 'none'; }, 2000);
+    }, 2000);
+}
+
+function openSkinChest() {
+    if (game.tournament.diamonds < 100) {
+        document.getElementById('skinChestResult').textContent = '❌ Недостаточно изумрудов!';
+        return;
+    }
+    game.tournament.diamonds -= 100;
+    const slot = document.getElementById('skinChestSlot');
+    slot.style.display = 'flex';
+    const reels = [document.getElementById('skinReel1'), document.getElementById('skinReel2'), document.getElementById('skinReel3')];
+    reels.forEach(reel => reel.classList.add('spinning'));
+    // Выбор случайного скина
+    const availableSkins = SKINS.filter(s => s.id !== 'standard');
+    const wonSkin = availableSkins[Math.floor(Math.random() * availableSkins.length)];
+    setTimeout(() => {
+        reels.forEach(reel => {
+            reel.classList.remove('spinning');
+            reel.textContent = wonSkin.icon;
+        });
+        if (!game.inventory.skins.includes(wonSkin.id)) {
+            game.inventory.skins.push(wonSkin.id);
+            document.getElementById('skinChestResult').textContent = '🎨 Вы выиграли скин ' + wonSkin.name + '!';
+        } else {
+            // Если скин уже есть, даём изумруды
+            const compensation = 20;
+            game.tournament.diamonds += compensation;
+            document.getElementById('skinChestResult').textContent = '🔄 У вас уже есть этот скин, получено ' + compensation + ' изумрудов!';
+        }
+        saveGame();
+        updateUI();
+        playPurchaseSound();
+        setTimeout(() => { slot.style.display = 'none'; }, 2000);
+    }, 2000);
+}
+
+// ================================================================
+//  КОДЫ
+// ================================================================
+function applyCode() {
+    const code = document.getElementById('codeInput').value.trim();
+    const msg = document.getElementById('codeMessage');
+    if (!code) { msg.textContent = 'Введите код'; return; }
+
+    if (usedCodes[code]) {
+        msg.textContent = '❌ Этот код уже был использован!';
+        return;
+    }
+
+    let success = false;
+    if (code === '0000') { addPotion('infinite_clicks'); success = true; msg.textContent = '✅ Получено зелье "Бесконечный клик"!'; }
+    else if (code === '0100') { addPotion('auto_clicker'); success = true; msg.textContent = '✅ Получено зелье "Автокликер"!'; }
+    else if (code === '0200') { addPotion('double_income'); success = true; msg.textContent = '✅ Получено зелье "Удвоение дохода"!'; }
+    else if (code === '1111') { addPotion('infinite_energy'); success = true; msg.textContent = '✅ Получено зелье "Бесконечная энергия"!'; }
+    else if (code === '0101') { game.coins += 9999; success = true; msg.textContent = '✅ Получено 9999 монет!'; saveGame(); updateUI(); }
+    else if (code === '0303') { game.coins += 6666; success = true; msg.textContent = '✅ Получено 6666 монет!'; saveGame(); updateUI(); }
+    else if (code === '001' || code === '0002' || code === '0003') {
+        addPotion('double_income');
+        success = true;
+        msg.textContent = '✅ Получено зелье "Удвоение дохода"!';
+    }
+    else if (code === '000000') {
+        loadUserData(currentUser).then(data => {
+            if (data) {
+                data.admin = true;
+                saveUserData(currentUser, data);
+                isAdmin = true;
+                msg.textContent = '✅ Вы стали администратором (синяя галочка)!';
+                updateUI();
+            }
+        });
+        success = true;
+    }
+    else if (code === '611') {
+        loadUserData(currentUser).then(data => {
+            if (data) {
+                data.superadmin = true;
+                data.admin = true;
+                saveUserData(currentUser, data);
+                isSuperAdmin = true;
+                isAdmin = true;
+                document.getElementById('adminPanel').style.display = 'block';
+                msg.textContent = '✅ Вы стали суперадмином (золотая звезда)!';
+                updateUI();
+            }
+        });
+        success = true;
+    }
+    else {
+        msg.textContent = '❌ Неверный код';
+        return;
+    }
+
+    if (success) {
+        usedCodes[code] = true;
+        saveGame();
+        document.getElementById('codeInput').value = '';
+        setTimeout(() => { msg.textContent = ''; }, 3000);
+        playPurchaseSound();
+    }
+}
+
+// ================================================================
+//  ЗВУКИ (с возможностью смены частоты)
+// ================================================================
+let audioCtx = null;
+let audioFrequency = 700;
+
+function playClickSound() {
+    try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const notes = [audioFrequency, audioFrequency * 1.2];
+        notes.forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.1, audioCtx.currentTime + i * 0.06);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + i * 0.06 + 0.1);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(audioCtx.currentTime + i * 0.06);
+            osc.stop(audioCtx.currentTime + i * 0.06 + 0.1);
+        });
+    } catch(e) {}
+}
+
+function playPurchaseSound() {
+    try {
+        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+        const notes = [523, 659, 784, 1047];
+        notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+            gain.gain.setValueAtTime(0.1, ctx.currentTime + i * 0.08);
+            gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + i * 0.08 + 0.15);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime + i * 0.08);
+            osc.stop(ctx.currentTime + i * 0.08 + 0.15);
+        });
+    } catch(e) {}
+}
+
+// ================================================================
+//  КЛИК (обычный и турнирный)
+// ================================================================
+function clickCoin(e, tournament) {
+    const target = tournament ? game.tournament : game;
+    const isMain = !tournament;
+    const energyKey = tournament ? 'energy' : 'energy';
+    const maxEnergyKey = tournament ? 'maxEnergy' : 'maxEnergy';
+    const clickPowerKey = tournament ? 'clickPower' : 'clickPower';
+    const coinsKey = tournament ? 'coins' : 'coins';
+    const totalClicksKey = tournament ? 'totalClicks' : 'totalClicks';
+    const lbScoreKey = tournament ? 'lbScore' : 'lbScore';
+
+    if (tournament) {
+        // Турнирный клик
+        if (target.energy < 1) { shakeElement(document.getElementById('tournamentClickCoin')); return; }
+        target.energy -= 1;
+        target.coins += target.clickPower;
+        target.totalClicks += 1;
+        target.lbScore += 1;
+        // Добавляем шанс на изумруд
+        if (Math.random() < 0.02) {
+            target.diamonds += 1;
+            spawnFloatText('💎 Турнир +1', { clientX: window.innerWidth/2, clientY: 80 });
+        }
+        spawnFloatText('+' + formatNumber(target.clickPower), e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+        playClickSound();
+        saveGame();
+        updateUI();
+        updateTournamentUI();
+    } else {
+        // Обычный клик с эффектами
+        if (activeEffect && activeEffect.type === 'infinite_energy') {
+            let earn = game.clickPower;
+            if (activeEffect && activeEffect.type === 'double_income') earn *= 2;
+            game.coins += earn;
+            game.totalClicks += 1;
+            game.lbScore += 1;
+            spawnFloatText('+' + formatNumber(earn), e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+            playClickSound();
+            updateUI();
+            return;
+        }
+        if (activeEffect && activeEffect.type === 'infinite_clicks') {
+            let earn = game.clickPower;
+            if (activeEffect && activeEffect.type === 'double_income') earn *= 2;
+            game.coins += earn;
+            game.totalClicks += 1;
+            game.lbScore += 1;
+            spawnFloatText('+' + formatNumber(earn), e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+            playClickSound();
+            updateUI();
+            return;
+        }
+        if (activeEffect && activeEffect.type === 'double_income') {
+            if (game.energy < 1) { shakeElement(document.getElementById('clickCoin')); return; }
+            game.energy -= 1;
+            game.coins += game.clickPower * 2;
+            game.totalClicks += 1;
+            game.lbScore += 1;
+            spawnFloatText('+' + formatNumber(game.clickPower * 2), e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+            playClickSound();
+            updateUI();
+            return;
+        }
+        // Обычный клик
+        if (game.energy < 1) { shakeElement(document.getElementById('clickCoin')); return; }
+        game.energy -= 1;
+        game.coins += game.clickPower;
+        game.totalClicks += 1;
+        game.lbScore += 1;
+        spawnFloatText('+' + formatNumber(game.clickPower), e || {clientX: window.innerWidth/2, clientY: window.innerHeight/2-40});
+        playClickSound();
+        updateUI();
+    }
+}
+
+// ================================================================
+//  ОБНОВЛЕНИЕ UI (общее)
+// ================================================================
+function updateUI() {
+    if (!game) return;
+    const coinsStr = formatNumber(game.coins);
+    const diaStr = formatNumber(game.diamonds);
+    document.getElementById('headerCoins').textContent = coinsStr;
+    document.getElementById('headerDiamonds').textContent = diaStr;
+    document.getElementById('mainCoins').textContent = coinsStr;
+    document.getElementById('mainDiamonds').textContent = diaStr;
+    const pct = (game.energy / game.maxEnergy) * 100;
+    document.getElementById('energyFill').style.width = pct + '%';
+    document.getElementById('energyLabel').textContent = Math.floor(game.energy) + ' / ' + game.maxEnergy;
+    document.getElementById('statClicks').textContent = formatNumber(game.totalClicks);
+    document.getElementById('statClickPower').textContent = formatNumber(game.clickPower);
+    document.getElementById('statMaxEnergy').textContent = game.maxEnergy;
+    let totalIncome = (game.incomeLevel * 10) + (game.incomeBonus || 0);
+    for (let b in game.brands) {
+        totalIncome += game.brands[b].income || 0;
+    }
+    document.getElementById('statIncomePerSec').textContent = formatNumber(totalIncome);
+    renderShop();
+    renderBrands();
+    renderDiamondShop();
+    renderDiamondSpeedShop();
+    renderLeaderboard();
+    updateProfile();
+    document.getElementById('clickCoin').style.opacity = game.energy >= 1 ? '1' : '0.6';
+    updateDiamondTimer();
+    checkQuests();
+    renderInventory();
+    saveGame();
+    // Турнирный UI
+    updateTournamentUI();
+}
+
+// ================================================================
+//  ПРОФИЛЬ (со званиями и скинами)
+// ================================================================
+function updateProfile() {
+    if (!currentUser || !game) return;
+    document.getElementById('profileNick').textContent = currentUser;
+    const regDate = new Date(game.registeredAt || Date.now());
+    document.getElementById('profileRegistered').textContent = regDate.toLocaleDateString() + ' ' + regDate.toLocaleTimeString();
+    document.getElementById('profileClicks').textContent = formatNumber(game.totalClicks || 0);
+    document.getElementById('profileChests').textContent = game.chestOpened || 0;
+    const seconds = Math.floor((Date.now() - (game.registeredAt || Date.now())) / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    if (hours > 0) document.getElementById('profileTime').textContent = hours + 'ч ' + (minutes % 60) + 'м';
+    else document.getElementById('profileTime').textContent = minutes + ' мин';
+    let totalQuests = 0;
+    for (let chain in questChains) {
+        totalQuests += game.questProgress[chain] || 0;
+    }
+    document.getElementById('profileQuests').textContent = totalQuests;
+    let potionCount = 0;
+    if (game.inventory) {
+        for (let p of game.inventory.potions) potionCount += p.count || 0;
+    }
+    document.getElementById('profilePotions').textContent = potionCount;
+    document.getElementById('profileLBScore').textContent = game.lbScore || 0;
+    // Звания
+    const titles = game.titles || [];
+    if (titles.length > 0) {
+        document.getElementById('profileTitles').innerHTML = titles.map(t => `<span class="title-badge ${getTitleRarity(t)}">${t}</span>`).join(' ');
+    } else {
+        document.getElementById('profileTitles').textContent = 'нет';
+    }
+    // Активный скин
+    const activeSkin = game.inventory.activeSkin || 'standard';
+    const skin = SKINS.find(s => s.id === activeSkin);
+    document.getElementById('profileActiveSkin').textContent = skin ? skin.name : 'Стандартный';
+}
+
+function getTitleRarity(title) {
+    if (title.includes('Бог') || title.includes('Империя') || title.includes('Легенда')) return 'legendary';
+    if (title.includes('Олигарх') || title.includes('Магнат')) return 'epic';
+    if (title.includes('Мастер') || title.includes('Миллионер') || title.includes('Бизнес')) return 'rare';
+    return 'common';
+}
+
+// ================================================================
+//  ЛИДЕРБОРД (два типа)
+// ================================================================
+let currentLeaderboardType = 'main';
+
+async function renderLeaderboard(type = currentLeaderboardType) {
+    currentLeaderboardType = type;
+    const container = document.getElementById('leaderList');
+    const now = Date.now();
+    if (leaderboardCache && (now - leaderboardCacheTime) < 5000 && type === 'main') {
+        container.innerHTML = leaderboardCache;
+        return;
+    }
+    container.innerHTML = 'Загрузка...';
+    const users = await loadAllUsers();
+    let list = [];
+    for (let nick in users) {
+        if (users[nick].game) {
+            const score = (type === 'main') ? (users[nick].game.lbScore || 0) : (users[nick].game.tournament ? users[nick].game.tournament.lbScore || 0 : 0);
+            const admin = users[nick].admin || false;
+            const superadmin = users[nick].superadmin || false;
+            list.push({ nickname: nick, lbScore: score, admin, superadmin });
+        }
+    }
+    list.sort((a,b) => b.lbScore - a.lbScore);
+    const top = list.slice(0, 50);
+    let html = '';
+    if (top.length === 0) {
+        html = '<p style="text-align:center;color:#7a8a9e;font-size:13px;">Пока никого нет</p>';
+    } else {
+        top.forEach((entry, idx) => {
+            const isMe = entry.nickname === currentUser;
+            let rankClass = '';
+            if (idx === 0) rankClass = 'gold';
+            else if (idx === 1) rankClass = 'silver';
+            else if (idx === 2) rankClass = 'bronze';
+            let badges = '';
+            if (entry.superadmin) badges += '<span class="badge-icon super"><i class="fas fa-crown"></i></span>';
+            else if (entry.admin) badges += '<span class="badge-icon admin"><i class="fas fa-check-circle"></i></span>';
+            html += `
+                <div class="leader-item" style="${isMe ? 'border-left-color:#4fc3f7;' : ''}" data-nick="${entry.nickname}">
+                    <span class="rank ${rankClass}">#${idx+1}</span>
+                    <span class="name">${entry.nickname} ${badges} ${isMe ? '⭐' : ''}</span>
+                    <span class="score">${formatNumber(entry.lbScore)}</span>
+                </div>
+            `;
+        });
+    }
+    container.innerHTML = html;
+    leaderboardCache = html;
+    leaderboardCacheTime = now;
+
+    container.onclick = function(e) {
+        const item = e.target.closest('.leader-item');
+        if (item) {
+            const nick = item.dataset.nick;
+            if (nick) showPlayerProfile(nick);
+        }
+    };
+}
+
+// ================================================================
+//  ЛИДЕРБОРД ТАЙМЕР (3 часа, общий)
+// ================================================================
+const CYCLE_MS = 3 * 60 * 60 * 1000;
+let leaderboardResetTime = Date.now();
+
+function updateLeaderboardTimer() {
+    getLeaderboardResetTime().then(resetTime => {
+        leaderboardResetTime = resetTime || Date.now();
+        const now = Date.now();
+        const elapsed = now - leaderboardResetTime;
+        const remaining = Math.max(0, CYCLE_MS - elapsed);
+        const hours = Math.floor(remaining / (60 * 60 * 1000));
+        const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000));
+        const seconds = Math.floor((remaining % (60 * 1000)) / 1000);
+        document.getElementById('leaderboardTimer').textContent =
+            `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        if (remaining < 1000) {
+            resetLeaderboardNow();
+        }
+    });
+}
+
+async function resetLeaderboardNow() {
+    const users = await loadAllUsers();
+    // Собираем данные по обычному и турнирному лидерборду
+    const mainList = [];
+    const tournList = [];
+    for (let nick in users) {
+        if (users[nick].game) {
+            const mainScore = users[nick].game.lbScore || 0;
+            const tournScore = users[nick].game.tournament ? users[nick].game.tournament.lbScore || 0 : 0;
+            mainList.push({ nickname: nick, lbScore: mainScore });
+            tournList.push({ nickname: nick, lbScore: tournScore });
+        }
+    }
+    mainList.sort((a,b) => b.lbScore - a.lbScore);
+    tournList.sort((a,b) => b.lbScore - a.lbScore);
+    // Награды для обычного лидерборда (алмазы)
+    mainList.forEach((entry, idx) => {
+        let reward = 0;
+        if (idx === 0) reward = 100;
+        else if (idx === 1) reward = 75;
+        else if (idx === 2) reward = 50;
+        else if (idx < 10) reward = 10;
+        if (reward > 0 && entry.lbScore > 0) {
+            const userData = users[entry.nickname];
+            if (userData && userData.game) {
+                userData.game.diamonds = (userData.game.diamonds || 0) + reward;
+                saveUserData(entry.nickname, userData);
+            }
+        }
+    });
+    // Награды для турнирного лидерборда (изумруды)
+    tournList.forEach((entry, idx) => {
+        let reward = 0;
+        if (idx === 0) reward = 50;
+        else if (idx === 1) reward = 30;
+        else if (idx === 2) reward = 15;
+        else if (idx < 10) reward = 5;
+        if (reward > 0 && entry.lbScore > 0) {
+            const userData = users[entry.nickname];
+            if (userData && userData.game && userData.game.tournament) {
+                userData.game.tournament.diamonds = (userData.game.tournament.diamonds || 0) + reward;
+                saveUserData(entry.nickname, userData);
+            }
+        }
+    });
+    // Обнуляем lbScore у всех
+    for (let nick in users) {
+        if (users[nick].game) {
+            users[nick].game.lbScore = 0;
+            if (users[nick].game.tournament) users[nick].game.tournament.lbScore = 0;
+            saveUserData(nick, users[nick]);
+        }
+    }
+    const newResetTime = Date.now();
+    await setLeaderboardResetTime(newResetTime);
+    leaderboardResetTime = newResetTime;
+    leaderboardCache = null;
+    if (currentUser) {
+        const data = await loadUserData(currentUser);
+        if (data && data.game) {
+            game = data.game;
+            if (!game.brands) game.brands = getDefaultGame().brands;
+            if (!game.inventory) game.inventory = { potions: [], skins: [], activeSkin: null };
+            if (!game.questProgress) game.questProgress = { clicks: 0, coins: 0, brands: 0, brands_level: 0 };
+            if (!game.titles) game.titles = [];
+            if (!game.tournament) game.tournament = getDefaultTournament();
+            updateBrandIncomes();
+            updateUI();
+        }
+    }
+}
+
+// ================================================================
+//  ПРОФИЛЬ (модалка)
+// ================================================================
+async function showPlayerProfile(nick) {
+    const data = await loadUserData(nick);
+    if (!data) return;
+    const g = data.game || {};
+    const modal = document.getElementById('profileModal');
+    const content = document.getElementById('profileModalContent');
+    const actions = document.getElementById('profileModalActions');
+
+    const regDate = g.registeredAt ? new Date(g.registeredAt) : new Date();
+    const seconds = Math.floor((Date.now() - (g.registeredAt || Date.now())) / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    let timeStr = minutes + ' мин';
+    if (hours > 0) timeStr = hours + 'ч ' + (minutes % 60) + 'м';
+    let questCount = 0;
+    if (g.questProgress) {
+        for (let chain in g.questProgress) questCount += g.questProgress[chain] || 0;
+    }
+    const titles = g.titles || [];
+    const activeSkin = g.inventory ? g.inventory.activeSkin : 'standard';
+    const skin = SKINS.find(s => s.id === activeSkin);
+
+    content.innerHTML = `
+        <div class="profile-detail"><span class="label">Ник</span><span>${nick}</span></div>
+        <div class="profile-detail"><span class="label">Зарегистрирован</span><span>${regDate.toLocaleDateString()}</span></div>
+        <div class="profile-detail"><span class="label">Кликов</span><span>${formatNumber(g.totalClicks || 0)}</span></div>
+        <div class="profile-detail"><span class="label">Открыто сундуков</span><span>${g.chestOpened || 0}</span></div>
+        <div class="profile-detail"><span class="label">Выполнено квестов</span><span>${questCount}</span></div>
+        <div class="profile-detail"><span class="label">Время в игре</span><span>${timeStr}</span></div>
+        <div class="profile-detail"><span class="label">Монеты</span><span>${formatNumber(g.coins || 0)}</span></div>
+        <div class="profile-detail"><span class="label">Алмазы</span><span>${formatNumber(g.diamonds || 0)}</span></div>
+        <div class="profile-detail"><span class="label">Очки лидерборда</span><span>${formatNumber(g.lbScore || 0)}</span></div>
+        <div class="profile-detail"><span class="label">Звания</span><span>${titles.length > 0 ? titles.join(', ') : 'нет'}</span></div>
+        <div class="profile-detail"><span class="label">Активный скин</span><span>${skin ? skin.name : 'Стандартный'}</span></div>
+    `;
+
+    actions.innerHTML = '';
+    if (isAdmin || isSuperAdmin) {
+        actions.innerHTML += '<div class="group-label">💰 Монеты</div>';
+        actions.appendChild(createActionBtn('+100', () => { g.coins = (g.coins || 0) + 100; data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+        actions.appendChild(createActionBtn('+1000', () => { g.coins = (g.coins || 0) + 1000; data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+        actions.appendChild(createActionBtn('+10000', () => { g.coins = (g.coins || 0) + 10000; data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+        actions.appendChild(createActionBtn('-100', () => { g.coins = Math.max(0, (g.coins || 0) - 100); data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+        actions.appendChild(createActionBtn('-1000', () => { g.coins = Math.max(0, (g.coins || 0) - 1000); data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+        actions.appendChild(createActionBtn('-10000', () => { g.coins = Math.max(0, (g.coins || 0) - 10000); data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+        actions.innerHTML += '<div class="group-label">💎 Алмазы</div>';
+        actions.appendChild(createActionBtn('+1💎', () => { g.diamonds = (g.diamonds || 0) + 1; data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+        actions.appendChild(createActionBtn('+10💎', () => { g.diamonds = (g.diamonds || 0) + 10; data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+        actions.appendChild(createActionBtn('+100💎', () => { g.diamonds = (g.diamonds || 0) + 100; data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+        actions.appendChild(createActionBtn('-1💎', () => { g.diamonds = Math.max(0, (g.diamonds || 0) - 1); data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+        actions.appendChild(createActionBtn('-10💎', () => { g.diamonds = Math.max(0, (g.diamonds || 0) - 10); data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+        actions.appendChild(createActionBtn('-100💎', () => { g.diamonds = Math.max(0, (g.diamonds || 0) - 100); data.game = g; saveUserData(nick, data); showPlayerProfile(nick); updateUI(); }));
+    }
+    if (isSuperAdmin && nick !== currentUser) {
+        actions.innerHTML += '<div class="group-label">⚠️ Опасные действия</div>';
+        actions.appendChild(createActionBtn('🗑️ Удалить аккаунт', async function() {
+            if (confirm(`Вы уверены, что хотите удалить аккаунт игрока ${nick}? Это действие необратимо!`)) {
+                await database.ref('users/' + nick).remove();
+                alert('Аккаунт удалён');
+                document.getElementById('profileModal').style.display = 'none';
+                leaderboardCache = null;
+                updateUI();
+            }
+        }, 'danger'));
+    }
+
+    modal.style.display = 'flex';
+}
+
+function createActionBtn(text, callback, className = 'primary') {
+    const btn = document.createElement('button');
+    btn.textContent = text;
+    btn.className = className;
+    btn.addEventListener('click', callback);
+    return btn;
+}
+
+document.getElementById('profileModalClose').addEventListener('click', function() {
+    document.getElementById('profileModal').style.display = 'none';
+});
+document.getElementById('profileModal').addEventListener('click', function(e) {
+    if (e.target === this) this.style.display = 'none';
+});
+
+// ================================================================
+//  ВСПОМОГАТЕЛЬНЫЕ
+// ================================================================
+function formatNumber(n) {
+    if (n >= 1e9) return (n / 1e9).toFixed(2) + 'B';
+    if (n >= 1e6) return (n / 1e6).toFixed(2) + 'M';
+    if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K';
+    return Math.floor(n).toString();
+}
+
+function shakeElement(el) {
+    el.style.animation = 'none';
+    void el.offsetHeight;
+    el.style.animation = 'shake 0.2s';
+    setTimeout(() => el.style.animation = '', 300);
+}
+
+function spawnFloatText(text, ev) {
+    const el = document.createElement('div');
+    el.className = 'float-text';
+    el.textContent = text;
+    const x = ev.clientX || window.innerWidth/2;
+    const y = ev.clientY || window.innerHeight/2 - 40;
+    el.style.left = (x - 30 + (Math.random()*40-20)) + 'px';
+    el.style.top = (y - 20) + 'px';
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 700);
+}
+
+// ================================================================
+//  ВЫХОД
+// ================================================================
+function logout() {
+    if (confirm('Выйти из аккаунта?')) {
+        if (window._incomeInterval) clearInterval(window._incomeInterval);
+        if (window._energyInterval) clearInterval(window._energyInterval);
+        if (window._diamondInterval) clearInterval(window._diamondInterval);
+        if (window._tournamentDiamondInterval) clearInterval(window._tournamentDiamondInterval);
+        if (window._diamondTimerInterval) clearInterval(window._diamondTimerInterval);
+        if (window._leaderboardTimer) clearInterval(window._leaderboardTimer);
+        if (activeEffect && activeEffect.intervalId) clearInterval(activeEffect.intervalId);
+        activeEffect = null;
+        window._incomeInterval = null;
+        window._energyInterval = null;
+        window._diamondInterval = null;
+        window._tournamentDiamondInterval = null;
+        window._diamondTimerInterval = null;
+        window._leaderboardTimer = null;
+        currentUser = null;
+        game = null;
+        appEl.style.display = 'none';
+        authScreen.style.display = 'flex';
+        authStep1.classList.remove('hidden');
+        authStep2.classList.add('hidden');
+        authNick.value = '';
+        authPass.value = '';
+        authError.textContent = '';
+        document.getElementById('effectIndicator').style.display = 'none';
+    }
+}
+
+// ================================================================
+//  ЗАПУСК
+// ================================================================
+authScreen.style.display = 'flex';
+appEl.style.display = 'none';
+
+console.log('CryptoClicker PRO — глобальное обновление: турниры, скины, звания, сундуки-казино, баланс филиалов.');
+</script>
+</body>
+</html>

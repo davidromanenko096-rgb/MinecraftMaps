@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MyCraft — клон Майнкрафта</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- ЭКРАН ВХОДА -->
+    <div id="menu">
+        <div id="menuContent">
+            <h1>⛏️ MyCraft</h1>
+            <p>Клон Minecraft с нуля</p>
+            <button id="startBtn">Создать мир</button>
+            <button id="loadBtn">Загрузить мир</button>
+            <small>Управление: WASD / джойстик, клик — разрушить, правый клик / кнопка — поставить</small>
+        </div>
+    </div>
+
+    <!-- ИГРОВОЙ КОНТЕЙНЕР -->
+    <div id="game" style="display:none; width:100vw; height:100vh; position:relative;">
+        <!-- Интерфейс (панель инструментов) -->
+        <div id="ui">
+            <div id="blockSelection">
+                <div class="blockOption active" data-block="grass">🌿</div>
+                <div class="blockOption" data-block="dirt">🟫</div>
+                <div class="blockOption" data-block="stone">🪨</div>
+                <div class="blockOption" data-block="wood">🪵</div>
+                <div class="blockOption" data-block="leaves">🍃</div>
+            </div>
+            <div id="crosshair">+</div>
+            <div id="status">Чанков: 0</div>
+        </div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+    <script type="module" src="script.js"></script>
+</body>
+</html>

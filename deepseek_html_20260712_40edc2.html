@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>MyCraft</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-tap-highlight-color:transparent; }
+        body { overflow:hidden; background:#1a1a2e; touch-action:none; font-family:sans-serif; height:100vh; }
+        #menu {
+            position:absolute; top:0; left:0; right:0; bottom:0;
+            display:flex; justify-content:center; align-items:center; flex-direction:column;
+            background:radial-gradient(circle, #2b3a4a, #0d1b2a); z-index:20;
+        }
+        #menu h1 { color:#fff; font-size:3.5rem; text-shadow:0 0 30px #4caf50; margin-bottom:1rem; }
+        #menu button { padding:16px 48px; font-size:1.8rem; border:none; border-radius:60px; background:#4caf50; color:#fff; box-shadow:0 0 30px #4caf50; cursor:pointer; }
+        #game {
+            position:absolute; top:0; left:0; width:100%; height:100%; z-index:1;
+            display:none; background:#87CEEB;
+        }
+        #crosshair {
+            position:absolute; top:50%; left:50%; transform:translate(-50%,-50%);
+            color:#fff; font-size:2rem; text-shadow:0 0 5px #000; pointer-events:none; z-index:6;
+            opacity:0.6;
+        }
+        #status {
+            position:absolute; top:10px; left:10px; color:#fff; background:rgba(0,0,0,0.5); padding:4px 12px; border-radius:16px; font-size:0.8rem; z-index:7; pointer-events:none;
+        }
+        #blockSelector {
+            position:absolute; bottom:20px; left:50%; transform:translateX(-50%);
+            display:flex; gap:8px; background:rgba(0,0,0,0.6); padding:8px 12px; border-radius:16px; backdrop-filter:blur(4px); z-index:10;
+        }
+        .block-opt {
+            width:48px; height:48px; border-radius:8px; border:2px solid transparent;
+            display:flex; justify-content:center; align-items:center; color:#fff; font-weight:bold;
+            transition:0.2s; cursor:pointer;
+        }
+        .block-opt.active { border-color:#fff; background:rgba(255,255,255,0.2); }
+        #jumpBtn {
+            position:absolute; bottom:100px; right:30px; width:70px; height:70px; border-radius:50%;
+            background:rgba(255,255,255,0.2); border:2px solid rgba(255,255,255,0.5); color:#fff; font-size:1.5rem;
+            display:flex; justify-content:center; align-items:center; z-index:8; backdrop-filter:blur(2px);
+            touch-action:none; user-select:none;
+        }
+        #actionBtns {
+            position:absolute; bottom:100px; left:30px; display:flex; flex-direction:column; gap:10px; z-index:8;
+        }
+        .act-btn {
+            width:60px; height:60px; border-radius:12px; border:none; background:rgba(0,0,0,0.5); color:#fff; font-size:1.2rem; backdrop-filter:blur(2px); border:1px solid rgba(255,255,255,0.2);
+            touch-action:none;
+        }
+        #touchLeft, #touchRight {
+            position:absolute; bottom:0; width:50%; height:70%; z-index:2; touch-action:none;
+        }
+        #touchLeft { left:0; }
+        #touchRight { right:0; }
+        @media (orientation:portrait) {
+            #menu h1 { font-size:2.5rem; }
+            .block-opt { width:40px; height:40px; }
+            #jumpBtn { width:60px; height:60px; bottom:80px; right:20px; }
+            .act-btn { width:50px; height:50px; }
+        }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h1>⛏️ MyCraft</h1>
+        <button id="startBtn">Создать мир</button>
+    </div>
+    <div id="game">
+        <div id="crosshair">+</div>
+        <div id="status">Чанков: 0</div>
+        <div id="blockSelector">
+            <div class="block-opt active" data-block="grass" style="background:#7cb342;">Трава</div>
+            <div class="block-opt" data-block="dirt" style="background:#8d6e63;">Земля</div>
+            <div class="block-opt" data-block="stone" style="background:#9e9e9e;">Камень</div>
+            <div class="block-opt" data-block="wood" style="background:#6d4c41;">Дерево</div>
+        </div>
+        <div id="jumpBtn">⬆</div>
+        <div id="actionBtns">
+            <button class="act-btn" id="breakBtn">🔨</button>
+            <button class="act-btn" id="placeBtn">⬆</button>
+        </div>
+        <div id="touchLeft"></div>
+        <div id="touchRight"></div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+
+        // ----- ПЕРЕМЕННЫЕ -----
+        let scene, camera, renderer;
+        const world = { loaded: new Map(), loading: new Set() };
+        const CHUNK = 16;
+        const VIEW = 4;
+        let player = {
+            pos: new THREE.Vector3(8, 25, 8),
+            vel: new THREE.Vector3(0,0,0),
+            yaw: 0, pitch: -0.3,
+            onGround: false,
+            speed: 4, jump: 7, gravity: -18
+        };
+        let keys = { w:false, a:false, s:false, d:false, space:false };
+        let selectedBlock = 'grass';
+        let touchMove = { x:0, y:0 }, touchLook = { x:0, y:0 };
+        let isLocked = false;
+        const raycaster = new THREE.Raycaster();
+        const pointer = new THREE.Vector2(0,0);
+        let clock = new THREE.Clock();
+
+        // ----- ШУМ ПЕРЛИНА (сокращённо) -----
+        class Perlin {
+            constructor(seed) {
+                this.p = new Array(512);
+                const p = new Array(256);
+                for (let i=0;i<256;i++) p[i]=i;
+                for (let i=255;i>0;i--) {
+                    const n = Math.floor((i+1)*(seed+1));
+                    const q = n%(i+1);
+                    [p[i],p[q]] = [p[q],p[i]];
+                }
+                for (let i=0;i<512;i++) this.p[i]=p[i&255];
+            }
+            fade(t){return t*t*t*(t*(t*6-15)+10);}
+            lerp(a,b,t){return a+t*(b-a);}
+            grad(h,x,y){
+                const hh=h&3; const u=hh<2?x:y; const v=hh<2?y:x;
+                return ((hh&1)==0?u:-u)+((hh&2)==0?v:-v);
+            }
+            noise(x,y){
+                const xi=Math.floor(x)&255, yi=Math.floor(y)&255;
+                const xf=x-Math.floor(x), yf=y-Math.floor(y);
+                const u=this.fade(xf), v=this.fade(yf);
+                const a=this.p[xi]+yi, b=this.p[xi+1]+yi;
+                return this.lerp(
+                    this.lerp(this.grad(this.p[a],xf,yf), this.grad(this.p[b],xf-1,yf), u),
+                    this.lerp(this.grad(this.p[a+1],xf,yf-1), this.grad(this.p[b+1],xf-1,yf-1), u),
+                    v
+                );
+            }
+        }
+        const perlin = new Perlin(42);
+
+        // ----- ГЕНЕРАЦИЯ ЧАНКА -----
+        function genChunk(cx, cz) {
+            const blocks = [];
+            const heights = [];
+            for (let x=0; x<CHUNK; x++) {
+                for (let z=0; z<CHUNK; z++) {
+                    const wx = cx*CHUNK + x, wz = cz*CHUNK + z;
+                    let h = perlin.noise(wx*0.05, wz*0.05)*5 + perlin.noise(wx*0.1, wz*0.1)*2;
+                    h = Math.floor(h+6); if (h<1) h=1; if (h>18) h=18;
+                    heights.push(h);
+                }
+            }
+            const water = 4;
+            for (let x=0; x<CHUNK; x++) {
+                for (let z=0; z<CHUNK; z++) {
+                    const h = heights[x*CHUNK + z];
+                    for (let y=0; y<=Math.max(h,water); y++) {
+                        let typ = 'air';
+                        if (y===h) typ = (h<=water) ? (h<=water-1?'sand':'grass') : 'grass';
+                        else if (y>h) { if (y<=water) typ='water'; else continue; }
+                        else typ = (y>h-3)?'dirt':'stone';
+                        if (typ!=='air') blocks.push({x,y,z,typ});
+                    }
+                }
+            }
+            // деревья
+            for (let x=0; x<CHUNK; x++) {
+                for (let z=0; z<CHUNK; z++) {
+                    const h = heights[x*CHUNK + z];
+                    if (h>water && Math.random()<0.02) {
+                        const trunk = 4+Math.floor(Math.random()*3);
+                        for (let y=h+1; y<=h+trunk; y++) blocks.push({x,y,z,typ:'wood'});
+                        for (let dx=-2; dx<=2; dx++) {
+                            for (let dz=-2; dz<=2; dz++) {
+                                for (let dy=-1; dy<=1; dy++) {
+                                    const lx=x+dx, lz=z+dz, ly=h+trunk+dy;
+                                    if (lx<0||lx>=CHUNK||lz<0||lz>=CHUNK) continue;
+                                    if (Math.abs(dx)===2 && Math.abs(dz)===2) continue;
+                                    if (Math.abs(dx)===2 || Math.abs(dz)===2) {
+                                        if (dy===0 && Math.random()<0.5) continue;
+                                    }
+                                    blocks.push({x:lx,y:ly,z:lz,typ:'leaves'});
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            return blocks;
+        }
+
+        // ----- МАТЕРИАЛЫ -----
+        const mats = {
+            grass: new THREE.MeshLambertMaterial({color:0x7cb342}),
+            dirt: new THREE.MeshLambertMaterial({color:0x8d6e63}),
+            stone: new THREE.MeshLambertMaterial({color:0x9e9e9e}),
+            wood: new THREE.MeshLambertMaterial({color:0x6d4c41}),
+            leaves: new THREE.MeshLambertMaterial({color:0x4caf50}),
+            sand: new THREE.MeshLambertMaterial({color:0xf5deb3}),
+            water: new THREE.MeshLambertMaterial({color:0x2196f3, transparent:true, opacity:0.5}),
+        };
+        function getMat(t){ return mats[t] || mats.dirt; }
+
+        // ----- ЗАГРУЗКА/ВЫГРУЗКА ЧАНКОВ -----
+        function buildChunk(cx, cz, blocks) {
+            const key = cx+'_'+cz;
+            const group = new THREE.Group();
+            const geo = new THREE.BoxGeometry(0.98,0.98,0.98);
+            for (const b of blocks) {
+                if (b.typ==='air' || b.typ==='water') continue;
+                const mesh = new THREE.Mesh(geo, getMat(b.typ));
+                mesh.position.set(cx*CHUNK + b.x + 0.5, b.y+0.5, cz*CHUNK + b.z + 0.5);
+                mesh.castShadow = true; mesh.receiveShadow = true;
+                mesh.userData = {cx,cz,bx:b.x,by:b.y,bz:b.z};
+                group.add(mesh);
+            }
+            scene.add(group);
+            world.loaded.set(key, {group, blocks});
+        }
+        function unloadChunk(cx, cz) {
+            const key = cx+'_'+cz;
+            const entry = world.loaded.get(key);
+            if (entry) { scene.remove(entry.group); world.loaded.delete(key); }
+        }
+        function loadChunk(cx, cz) {
+            const key = cx+'_'+cz;
+            if (world.loaded.has(key) || world.loading.has(key)) return;
+            world.loading.add(key);
+            const blocks = genChunk(cx, cz);
+            buildChunk(cx, cz, blocks);
+            world.loading.delete(key);
+            updateStatus();
+        }
+        function updateChunks() {
+            const cx = Math.floor(player.pos.x / CHUNK);
+            const cz = Math.floor(player.pos.z / CHUNK);
+            const needed = new Set();
+            for (let dx=-VIEW; dx<=VIEW; dx++) {
+                for (let dz=-VIEW; dz<=VIEW; dz++) {
+                    if (Math.sqrt(dx*dx+dz*dz) <= VIEW) {
+                        const nx=cx+dx, nz=cz+dz;
+                        needed.add(nx+'_'+nz);
+                        loadChunk(nx, nz);
+                    }
+                }
+            }
+            for (const key of world.loaded.keys()) {
+                if (!needed.has(key)) {
+                    const [x,z] = key.split('_').map(Number);
+                    unloadChunk(x, z);
+                }
+            }
+            updateStatus();
+        }
+        function updateStatus() {
+            document.getElementById('status').textContent = 'Чанков: '+world.loaded.size;
+        }
+
+        // ----- РАБОТА С БЛОКАМИ -----
+        function getBlock(wx, wy, wz) {
+            const cx = Math.floor(wx/CHUNK), cz = Math.floor(wz/CHUNK);
+            const key = cx+'_'+cz;
+            const entry = world.loaded.get(key);
+            if (!entry) return null;
+            const bx = Math.floor(wx - cx*CHUNK), by = Math.floor(wy), bz = Math.floor(wz - cz*CHUNK);
+            for (const b of entry.blocks) {
+                if (b.x===bx && b.y===by && b.z===bz) return b;
+            }
+            return null;
+        }
+        function setBlock(wx, wy, wz, typ) {
+            const cx = Math.floor(wx/CHUNK), cz = Math.floor(wz/CHUNK);
+            const key = cx+'_'+cz;
+            const entry = world.loaded.get(key);
+            if (!entry) return;
+            const bx = Math.floor(wx - cx*CHUNK), by = Math.floor(wy), bz = Math.floor(wz - cz*CHUNK);
+            entry.blocks = entry.blocks.filter(b => !(b.x===bx && b.y===by && b.z===bz));
+            if (typ !== 'air') entry.blocks.push({x:bx,y:by,z:bz,typ});
+            // перестроить
+            scene.remove(entry.group);
+            const group = new THREE.Group();
+            const geo = new THREE.BoxGeometry(0.98,0.98,0.98);
+            for (const b of entry.blocks) {
+                if (b.typ==='air'||b.typ==='water') continue;
+                const mesh = new THREE.Mesh(geo, getMat(b.typ));
+                mesh.position.set(cx*CHUNK + b.x + 0.5, b.y+0.5, cz*CHUNK + b.z + 0.5);
+                mesh.castShadow = true; mesh.receiveShadow = true;
+                mesh.userData = {cx,cz,bx:b.x,by:b.y,bz:b.z};
+                group.add(mesh);
+            }
+            scene.add(group);
+            entry.group = group;
+        }
+
+        // ----- ПОЛУЧИТЬ БЛОК ПО ЛУЧУ -----
+        function getTarget() {
+            raycaster.setFromCamera(pointer, camera);
+            const hits = raycaster.intersectObjects(scene.children, true);
+            for (const hit of hits) {
+                const u = hit.object.userData;
+                if (u.cx !== undefined) {
+                    const wx = u.cx*CHUNK + u.bx;
+                    const wy = u.by;
+                    const wz = u.cz*CHUNK + u.bz;
+                    const face = hit.face.normal.clone();
+                    return {wx, wy, wz, face};
+                }
+            }
+            return null;
+        }
+        function breakBlock() {
+            const t = getTarget();
+            if (t) setBlock(t.wx, t.wy, t.wz, 'air');
+        }
+        function placeBlock() {
+            const t = getTarget();
+            if (t) {
+                const nx = t.wx + t.face.x, ny = t.wy + t.face.y, nz = t.wz + t.face.z;
+                const exist = getBlock(nx, ny, nz);
+                if (!exist || exist.typ==='air' || exist.typ==='water') {
+                    setBlock(nx, ny, nz, selectedBlock);
+                }
+            }
+        }
+
+        // ----- УПРАВЛЕНИЕ -----
+        function updateCamera() {
+            const euler = new THREE.Euler(player.pitch, player.yaw, 0, 'YXZ');
+            camera.quaternion.setFromEuler(euler);
+            camera.position.copy(player.pos);
+        }
+
+        // ----- ИНИЦИАЛИЗАЦИЯ -----
+        function initGame() {
+            document.getElementById('menu').style.display = 'none';
+            document.getElementById('game').style.display = 'block';
+
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 60, 120);
+
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth/window.innerHeight, 0.1, 200);
+            camera.position.copy(player.pos);
+
+            renderer = new THREE.WebGLRenderer({antialias: true});
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.getElementById('game').appendChild(renderer.domElement);
+
+            const ambient = new THREE.AmbientLight(0x404060);
+            scene.add(ambient);
+            const sun = new THREE.DirectionalLight(0xffeedd, 1.2);
+            sun.position.set(40,60,30);
+            sun.castShadow = true;
+            sun.shadow.mapSize.width = 1024;
+            sun.shadow.mapSize.height = 1024;
+            sun.shadow.camera.near = 0.5;
+            sun.shadow.camera.far = 150;
+            sun.shadow.camera.left = -80;
+            sun.shadow.camera.right = 80;
+            sun.shadow.camera.top = 80;
+            sun.shadow.camera.bottom = -80;
+            scene.add(sun);
+            const hemi = new THREE.HemisphereLight(0x87CEEB, 0x3a3a3a, 0.5);
+            scene.add(hemi);
+
+            updateCamera();
+            updateChunks();
+
+            // --- события ---
+            // выбор блока
+            document.querySelectorAll('.block-opt').forEach(el => {
+                el.addEventListener('click', () => {
+                    document.querySelectorAll('.block-opt').forEach(e => e.classList.remove('active'));
+                    el.classList.add('active');
+                    selectedBlock = el.dataset.block;
+                });
+            });
+            // прыжок
+            const jumpBtn = document.getElementById('jumpBtn');
+            jumpBtn.addEventListener('touchstart', e=>{ e.preventDefault(); keys.space=true; });
+            jumpBtn.addEventListener('touchend', e=>{ e.preventDefault(); keys.space=false; });
+            jumpBtn.addEventListener('mousedown', ()=>keys.space=true);
+            jumpBtn.addEventListener('mouseup', ()=>keys.space=false);
+            // кнопки действий
+            document.getElementById('breakBtn').addEventListener('click', breakBlock);
+            document.getElementById('placeBtn').addEventListener('click', placeBlock);
+            // клавиатура
+            document.addEventListener('keydown', e=>{
+                const k=e.key.toLowerCase();
+                if (k==='w') keys.w=true;
+                else if (k==='a') keys.a=true;
+                else if (k==='s') keys.s=true;
+                else if (k==='d') keys.d=true;
+                else if (k===' ') { keys.space=true; e.preventDefault(); }
+                else if (k>='1' && k<='4') {
+                    const idx = parseInt(k)-1;
+                    const opts = document.querySelectorAll('.block-opt');
+                    if (opts[idx]) { opts[idx].click(); }
+                }
+            });
+            document.addEventListener('keyup', e=>{
+                const k=e.key.toLowerCase();
+                if (k==='w') keys.w=false;
+                else if (k==='a') keys.a=false;
+                else if (k==='s') keys.s=false;
+                else if (k==='d') keys.d=false;
+                else if (k===' ') keys.space=false;
+            });
+            // мышь для ПК (pointer lock)
+            renderer.domElement.addEventListener('click', ()=>{
+                renderer.domElement.requestPointerLock();
+            });
+            document.addEventListener('pointerlockchange', ()=>{
+                isLocked = (document.pointerLockElement === renderer.domElement);
+            });
+            document.addEventListener('mousemove', e=>{
+                if (!isLocked) return;
+                const sens=0.002;
+                player.yaw -= e.movementX * sens;
+                player.pitch -= e.movementY * sens;
+                player.pitch = Math.max(-Math.PI/2+0.01, Math.min(Math.PI/2-0.01, player.pitch));
+                updateCamera();
+            });
+            renderer.domElement.addEventListener('mousedown', e=>{
+                if (!isLocked) return;
+                if (e.button===0) breakBlock();
+                else if (e.button===2) placeBlock();
+            });
+            renderer.domElement.addEventListener('contextmenu', e=>e.preventDefault());
+
+            // тач-управление
+            const left = document.getElementById('touchLeft');
+            const right = document.getElementById('touchRight');
+            let moveId=null, lookId=null;
+            let lastMove={x:0,y:0}, lastLook={x:0,y:0};
+
+            left.addEventListener('touchstart', e=>{
+                e.preventDefault();
+                const t=e.touches[0]; if(!t)return;
+                moveId=t.identifier;
+                lastMove.x=t.clientX; lastMove.y=t.clientY;
+            });
+            left.addEventListener('touchmove', e=>{
+                e.preventDefault();
+                if(moveId===null)return;
+                const t=Array.from(e.touches).find(t=>t.identifier===moveId);
+                if(!t)return;
+                const dx=t.clientX-lastMove.x, dy=t.clientY-lastMove.y;
+                lastMove.x=t.clientX; lastMove.y=t.clientY;
+                const threshold=50;
+                const mx=Math.max(-1, Math.min(1, dx/threshold));
+                const my=Math.max(-1, Math.min(1, dy/threshold));
+                keys.w = my < -0.2;
+                keys.s = my > 0.2;
+                keys.a = mx < -0.2;
+                keys.d = mx > 0.2;
+            });
+            left.addEventListener('touchend', e=>{
+                e.preventDefault();
+                moveId=null;
+                keys.w=false; keys.s=false; keys.a=false; keys.d=false;
+            });
+            left.addEventListener('touchcancel', left.onTouchend);
+
+            right.addEventListener('touchstart', e=>{
+                e.preventDefault();
+                const t=e.touches[0]; if(!t)return;
+                lookId=t.identifier;
+                lastLook.x=t.clientX; lastLook.y=t.clientY;
+            });
+            right.addEventListener('touchmove', e=>{
+                e.preventDefault();
+                if(lookId===null)return;
+                const t=Array.from(e.touches).find(t=>t.identifier===lookId);
+                if(!t)return;
+                const dx=t.clientX-lastLook.x, dy=t.clientY-lastLook.y;
+                lastLook.x=t.clientX; lastLook.y=t.clientY;
+                const sens=0.005;
+                player.yaw -= dx * sens;
+                player.pitch -= dy * sens;
+                player.pitch = Math.max(-Math.PI/2+0.01, Math.min(Math.PI/2-0.01, player.pitch));
+                updateCamera();
+            });
+            right.addEventListener('touchend', e=>{
+                e.preventDefault();
+                lookId=null;
+            });
+            right.addEventListener('touchcancel', right.onTouchend);
+
+            window.addEventListener('resize', ()=>{
+                const w=window.innerWidth, h=window.innerHeight;
+                renderer.setSize(w,h);
+                camera.aspect=w/h;
+                camera.updateProjectionMatrix();
+            });
+
+            animate();
+        }
+
+        // ----- АНИМАЦИЯ -----
+        function animate() {
+            requestAnimationFrame(animate);
+            const dt = Math.min(clock.getDelta(), 0.05);
+
+            // движение (если захвачена мышь или тач)
+            if (isLocked || document.pointerLockElement === renderer.domElement) {
+                const forward = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+                const right = new THREE.Vector3(1,0,0).applyQuaternion(camera.quaternion);
+                forward.y=0; forward.normalize();
+                right.y=0; right.normalize();
+                const move = new THREE.Vector3(0,0,0);
+                if (keys.w) move.add(forward);
+                if (keys.s) move.sub(forward);
+                if (keys.a) move.sub(right);
+                if (keys.d) move.add(right);
+                if (move.length()>0) move.normalize().multiplyScalar(player.speed * dt);
+                player.pos.x += move.x;
+                player.pos.z += move.z;
+
+                if (keys.space && player.onGround) {
+                    player.vel.y = player.jump;
+                    player.onGround = false;
+                }
+                player.vel.y += player.gravity * dt;
+                player.pos.y += player.vel.y * dt;
+
+                if (player.pos.y < 0) {
+                    player.pos.y = 0;
+                    player.vel.y = 0;
+                    player.onGround = true;
+                }
+                const below = getBlock(player.pos.x, player.pos.y-0.1, player.pos.z);
+                if (below && below.typ !== 'air' && below.typ !== 'water') {
+                    player.pos.y = Math.floor(player.pos.y) + 1;
+                    player.vel.y = 0;
+                    player.onGround = true;
+                } else {
+                    player.onGround = false;
+                }
+
+                updateCamera();
+                updateChunks();
+            }
+
+            renderer.render(scene, camera);
+        }
+
+        // ----- СТАРТ -----
+        document.getElementById('startBtn').addEventListener('click', initGame);
+        console.log('MyCraft загружен');
+    </script>
+</body>
+</html>

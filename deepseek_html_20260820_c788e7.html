@@ -1,0 +1,772 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎰 Слоты Online</title>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box;font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;user-select:none;-webkit-tap-highlight-color:transparent}
+        body{background:#0a0a12;color:#e0e0e0;min-height:100vh;display:flex;justify-content:center;align-items:center;padding:4px;background:radial-gradient(circle at 20% 30%, #1a1a2e, #0a0a12)}
+        #app{max-width:520px;width:100%;height:98vh;background:rgba(16,18,30,0.96);backdrop-filter:blur(8px);border-radius:24px;overflow:hidden;display:none;flex-direction:column;border:1px solid rgba(255,215,0,0.08);box-shadow:0 15px 50px rgba(0,0,0,0.9)}
+        .auth-screen{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;padding:20px;background:linear-gradient(145deg,#0f0f1a,#1a1a2e)}
+        .auth-screen h2{color:#ffd700;margin-bottom:20px;font-size:28px;letter-spacing:3px}
+        .auth-screen .step{width:100%;max-width:340px}
+        .auth-screen .input-group{width:100%;margin-bottom:12px}
+        .auth-screen .input-group input{width:100%;padding:14px 16px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.06);border-radius:14px;color:#e0e0e0;font-size:16px;outline:none;transition:0.3s}
+        .auth-screen .input-group input:focus{border-color:#ffd700;background:rgba(255,215,0,0.04)}
+        .auth-screen .btn{width:100%;padding:14px;border:none;border-radius:14px;font-weight:700;font-size:16px;cursor:pointer;transition:0.2s;margin-top:4px}
+        .auth-screen .btn-primary{background:linear-gradient(135deg,#ffd700,#f5a623);color:#0b0e14}
+        .auth-screen .btn-primary:hover{transform:scale(1.02)}
+        .auth-screen .btn-secondary{background:rgba(255,255,255,0.06);color:#e0e0e0}
+        .auth-screen .btn-secondary:hover{background:rgba(255,255,255,0.10)}
+        .auth-screen .error{color:#ff6b6b;font-size:14px;min-height:20px}
+        .auth-screen .hidden{display:none}
+        .top-nav{display:flex;justify-content:space-between;align-items:center;padding:6px 14px;background:rgba(0,0,0,0.3);border-bottom:1px solid rgba(255,255,255,0.04);flex-shrink:0}
+        .top-nav .title{font-weight:700;font-size:18px;color:#ffd700;letter-spacing:1px}
+        .top-nav .nav-btn{background:transparent;border:none;color:#8a9aaa;font-size:18px;cursor:pointer;padding:4px 8px;border-radius:8px;transition:0.2s}
+        .top-nav .nav-btn:hover{color:#ffd700}
+        .content{flex:1;overflow-y:auto;padding:4px 10px 60px;position:relative}
+        .tab{display:none;animation:fadeIn 0.25s ease}
+        .tab.active{display:block}
+        @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        .slot-machine{background:radial-gradient(ellipse at center,#1a1a2e,#0a0a12);border-radius:20px;padding:16px;border:2px solid rgba(255,215,0,0.08);box-shadow:inset 0 0 60px rgba(0,0,0,0.3)}
+        .reels{display:flex;gap:8px;justify-content:center;padding:12px;background:rgba(0,0,0,0.4);border-radius:16px;border:1px solid rgba(255,255,255,0.04)}
+        .reel{width:70px;height:100px;background:rgba(255,255,255,0.03);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:48px;overflow:hidden;border:1px solid rgba(255,255,255,0.06);transition:0.2s}
+        .reel .symbol{width:100%;height:100%;display:flex;align-items:center;justify-content:center;transition:transform 0.1s}
+        .reel.spinning .symbol{animation:spin 0.15s linear infinite}
+        @keyframes spin{0%{transform:translateY(0)}100%{transform:translateY(-100px)}}
+        .reel.win{border-color:#ffd700;box-shadow:0 0 30px rgba(255,215,0,0.2)}
+        .bet-area{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:6px 0}
+        .bet-chip{width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,0.08);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;cursor:pointer;transition:0.25s cubic-bezier(0.34,1.56,0.64,1);color:#fff;text-shadow:0 2px 6px rgba(0,0,0,0.5);box-shadow:0 4px 15px rgba(0,0,0,0.3)}
+        .bet-chip:active{transform:scale(0.85)}
+        .bet-chip:hover{transform:scale(1.08)}
+        .bet-chip.chip-5{background:radial-gradient(circle at 35% 30%, #ffd700, #b8860b)}
+        .bet-chip.chip-10{background:radial-gradient(circle at 35% 30%, #4fc3f7, #0d47a1)}
+        .bet-chip.chip-25{background:radial-gradient(circle at 35% 30%, #50c878, #1b5e20)}
+        .bet-chip.chip-50{background:radial-gradient(circle at 35% 30%, #ff6b6b, #b71c1c)}
+        .bet-chip.chip-100{background:radial-gradient(circle at 35% 30%, #9b59b6, #4a148c)}
+        .bet-chip.chip-500{background:radial-gradient(circle at 35% 30%, #ff9800, #e65100)}
+        .slot-controls{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin:6px 0 4px}
+        .slot-btn{padding:10px 24px;border:none;border-radius:30px;font-weight:700;font-size:14px;cursor:pointer;transition:0.2s;background:linear-gradient(135deg,#ffd700,#f5a623);color:#0b0e14}
+        .slot-btn:active{transform:scale(0.95)}
+        .slot-btn:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+        .result-display{text-align:center;padding:4px;font-size:17px;font-weight:700;min-height:28px;color:#ffd700}
+        .balance-display{display:flex;gap:12px;justify-content:center;padding:4px;background:rgba(0,0,0,0.25);border-radius:12px;margin-bottom:4px;flex-wrap:wrap}
+        .balance-display span{font-weight:700;font-size:14px}
+        .balance-display .coins{color:#ffd700}
+        .balance-display .players-online{color:#4fc3f7}
+        .bottom-nav{display:flex;justify-content:space-around;padding:4px 0 6px;background:rgba(0,0,0,0.4);border-top:1px solid rgba(255,255,255,0.04);flex-shrink:0;position:sticky;bottom:0}
+        .bottom-nav .nav-item{display:flex;flex-direction:column;align-items:center;font-size:9px;color:#7a8a9e;cursor:pointer;padding:3px 6px;border-radius:12px;transition:0.2s;background:transparent;border:none;gap:1px}
+        .bottom-nav .nav-item i{font-size:18px}
+        .bottom-nav .nav-item.active{color:#ffd700;background:rgba(255,215,0,0.06)}
+        .leader-item{display:flex;justify-content:space-between;padding:4px 10px;background:rgba(255,255,255,0.02);border-radius:8px;margin-bottom:3px;border-left:3px solid #ffd700;font-size:12px}
+        .leader-item .rank{font-weight:700;color:#ffd700;width:24px}
+        .leader-item .rank.gold{color:#ffd700}
+        .leader-item .rank.silver{color:#c0c0c0}
+        .leader-item .rank.bronze{color:#cd7f32}
+        .leader-item .name{flex:1;margin-left:4px}
+        .leader-item .score{font-weight:600}
+        .settings-group{background:rgba(255,255,255,0.02);border-radius:12px;padding:10px;margin-top:6px;border:1px solid rgba(255,255,255,0.04)}
+        .settings-group label{display:block;font-size:11px;margin-bottom:3px;color:#aabaca}
+        .settings-group input{width:100%;padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:8px;color:#e0e0e0;font-size:13px;outline:none}
+        .settings-group input:focus{border-color:#ffd700}
+        .btn{margin-top:6px;background:linear-gradient(135deg,#ffd700,#f5a623);color:#0b0e14;border:none;padding:8px;border-radius:30px;font-weight:700;font-size:13px;width:100%;cursor:pointer;transition:0.2s}
+        .btn:hover{transform:scale(1.02)}
+        .btn-danger{background:linear-gradient(135deg,#e74c3c,#c0392b);color:white}
+        .admin-tag{background:#ffd700;color:#0b0e14;padding:2px 6px;border-radius:12px;font-size:9px;font-weight:700;margin-left:4px}
+        .notification{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:rgba(16,18,30,0.96);border:1px solid rgba(255,215,0,0.15);border-radius:16px;padding:8px 16px;z-index:2000;color:#e0e0e0;font-size:13px;font-weight:600;box-shadow:0 10px 40px rgba(0,0,0,0.8);display:none;align-items:center;gap:8px;max-width:90%}
+        .notification .notif-close{background:none;border:none;color:#8a9aaa;font-size:16px;cursor:pointer}
+        .leaderboard-container{max-height:400px;overflow-y:auto}
+        .bet-row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px;justify-content:center}
+        .bet-row label{font-size:12px;color:#aabaca}
+        .bet-row input{background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:4px 8px;color:#e0e0e0;width:60px;font-size:14px;text-align:center}
+        @media(max-width:480px){.reel{width:60px;height:85px;font-size:38px}.bet-chip{width:38px;height:38px;font-size:10px}.slot-btn{padding:8px 16px;font-size:12px}}
+        .win-animation{animation:winGlow 0.6s ease 3}
+        @keyframes winGlow{0%,100%{text-shadow:0 0 10px rgba(255,215,0,0)}50%{text-shadow:0 0 40px rgba(255,215,0,0.8),0 0 80px rgba(255,215,0,0.3)}}
+    </style>
+</head>
+<body>
+
+    <div id="authScreen" class="auth-screen">
+        <h2>🎰 Слоты</h2>
+        <div class="error" id="authError"></div>
+        <div id="authStep1" class="step">
+            <div class="input-group"><input type="text" id="authNick" placeholder="Никнейм"></div>
+            <button class="btn btn-primary" id="authNextBtn">Далее</button>
+        </div>
+        <div id="authStep2" class="step hidden">
+            <div class="input-group"><input type="password" id="authPass" placeholder="Пароль"></div>
+            <button class="btn btn-primary" id="authLoginBtn">Войти</button>
+            <button class="btn btn-secondary" id="authBackBtn">Назад</button>
+        </div>
+    </div>
+
+    <div id="app" style="display:none;">
+        <div id="notification" class="notification">
+            <span id="notifText">Награда!</span>
+            <button class="notif-close" id="notifClose">&times;</button>
+        </div>
+
+        <audio id="bgMusic" loop preload="auto" style="display:none;">
+            <source src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3" type="audio/mpeg">
+        </audio>
+        <audio id="spinSound" preload="auto" style="display:none;">
+            <source src="https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3" type="audio/mpeg">
+        </audio>
+        <audio id="winSound" preload="auto" style="display:none;">
+            <source src="https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3" type="audio/mpeg">
+        </audio>
+
+        <div class="top-nav">
+            <button class="nav-btn" id="settingsBtn"><i class="fas fa-cog"></i></button>
+            <div class="title">🎰 Слоты</div>
+            <button class="nav-btn" id="leaderboardBtn"><i class="fas fa-trophy"></i></button>
+        </div>
+
+        <div class="content">
+            <div id="tabMain" class="tab active">
+                <div class="balance-display">
+                    <span class="coins"><i class="fas fa-coins"></i> <span id="balanceCoins">0</span></span>
+                    <span class="players-online"><i class="fas fa-users"></i> <span id="onlineCount">0</span></span>
+                </div>
+
+                <div class="slot-machine">
+                    <div class="reels" id="reelsContainer">
+                        <div class="reel" id="reel1"><div class="symbol">🍒</div></div>
+                        <div class="reel" id="reel2"><div class="symbol">🍋</div></div>
+                        <div class="reel" id="reel3"><div class="symbol">🍊</div></div>
+                    </div>
+                    <div class="result-display" id="resultDisplay">Нажми "Крутить"</div>
+                </div>
+
+                <div class="bet-row">
+                    <label>Ставка:</label>
+                    <input type="number" id="bjBet" value="10" min="1" step="1">
+                </div>
+
+                <div class="bet-area" id="betChips">
+                    <div class="bet-chip chip-5" data-value="5">5</div>
+                    <div class="bet-chip chip-10" data-value="10">10</div>
+                    <div class="bet-chip chip-25" data-value="25">25</div>
+                    <div class="bet-chip chip-50" data-value="50">50</div>
+                    <div class="bet-chip chip-100" data-value="100">100</div>
+                    <div class="bet-chip chip-500" data-value="500">500</div>
+                </div>
+
+                <div class="slot-controls">
+                    <button class="slot-btn" id="spinBtn">🎰 Крутить</button>
+                </div>
+            </div>
+
+            <div id="tabLeaderboard" class="tab">
+                <h3 style="color:#ffd700;margin-bottom:8px;font-size:16px;">🏆 Лидерборд</h3>
+                <div id="leaderboardList" class="leaderboard-container"></div>
+                <div style="text-align:center;padding:6px;color:#4a5a6a;font-size:11px;">Обновляется каждые 3 секунды</div>
+            </div>
+
+            <div id="tabSettings" class="tab">
+                <h3 style="color:#ffd700;margin-bottom:8px;font-size:16px;">⚙️ Настройки</h3>
+                <div class="settings-group">
+                    <label>🎵 Музыка</label>
+                    <div class="music-controls">
+                        <div class="music-row">
+                            <button id="musicToggleBtn" class="music-btn">Включить</button>
+                            <span id="musicStatus" style="font-size:11px;color:#aabaca;">Выключена</span>
+                        </div>
+                        <div class="music-row">
+                            <span style="font-size:11px;color:#aabaca;">🔇</span>
+                            <input type="range" id="musicVolume" min="0" max="1" step="0.05" value="0.5">
+                            <span id="volumeLabel" style="font-size:11px;color:#aabaca;min-width:32px;">50%</span>
+                            <span style="font-size:11px;color:#aabaca;">🔊</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label>🔊 Звуки</label>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <button id="soundToggleBtn" style="background:transparent;border:none;color:#8a9aaa;font-size:16px;cursor:pointer;padding:3px 6px;"><i class="fas fa-volume-up"></i></button>
+                        <span id="soundStatus" style="font-size:11px;color:#aabaca;">Включены</span>
+                    </div>
+                </div>
+                <div class="settings-group">
+                    <label>Ваш ник: <strong id="settingsNick" style="color:#ffd700;font-size:13px;">Игрок</strong></label>
+                    <button class="btn btn-danger" id="logoutBtn">Выйти</button>
+                </div>
+                <div class="settings-group" id="adminPanel" style="display:none;border:1px solid rgba(255,215,0,0.12);border-radius:12px;">
+                    <h4 style="color:#ffd700;font-size:14px;"><i class="fas fa-crown"></i> Админ</h4>
+                    <label>Ник игрока</label>
+                    <input type="text" id="adminNick" placeholder="Ник" style="width:100%;padding:6px 10px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:8px;color:#e0e0e0;font-size:13px;outline:none;">
+                    <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:4px;">
+                        <input type="number" id="adminCoins" placeholder="Монеты" style="flex:1;min-width:50px;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:4px 6px;color:#e0e0e0;font-size:12px;">
+                        <button class="btn" id="adminAddCoins" style="flex:1;background:#ffd700;padding:4px 8px;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:12px;color:#0b0e14;">+</button>
+                        <button class="btn btn-danger" id="adminSubCoins" style="flex:1;padding:4px 8px;border:none;border-radius:8px;font-weight:700;cursor:pointer;font-size:12px;">-</button>
+                    </div>
+                    <button class="btn btn-danger" id="adminDeleteAccount" style="margin-top:6px;font-size:12px;padding:6px;">Удалить</button>
+                </div>
+                <div class="settings-group">
+                    <label>Код доступа</label>
+                    <input type="text" id="codeInput" placeholder="Код">
+                    <button class="btn" id="codeApplyBtn" style="font-size:12px;padding:6px;">Применить</button>
+                    <div id="codeMessage" style="margin-top:3px;font-size:11px;color:#aabaca;"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bottom-nav">
+            <button class="nav-item active" data-tab="tabMain"><i class="fas fa-home"></i> Игра</button>
+            <button class="nav-item" data-tab="tabLeaderboard"><i class="fas fa-trophy"></i> Лидерборд</button>
+            <button class="nav-item" data-tab="tabSettings"><i class="fas fa-cog"></i> Настройки</button>
+        </div>
+    </div>
+
+    <script>
+        // ================================================================
+        //  ТВОЙ КОНФИГ FIREBASE (СТАРЫЙ, РАБОЧИЙ)
+        // ================================================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyCfY53aFyEX-od8kbmNHzBTNwtpMFKdPLs",
+            authDomain: "crypto-clicker-game-d952e.firebaseapp.com",
+            databaseURL: "https://crypto-clicker-game-d952e-default-rtdb.firebaseio.com",
+            projectId: "crypto-clicker-game-d952e",
+            storageBucket: "crypto-clicker-game-d952e.firebasestorage.app",
+            messagingSenderId: "1034077574733",
+            appId: "1:1034077574733:web:c09493fcb59f72bd2c6e04",
+            measurementId: "G-0Z3ZRDQ0PD"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const database = firebase.database();
+
+        let currentUser = null;
+        let currentPassword = null;
+        let userData = null;
+        let isAdmin = false;
+        let isSpinning = false;
+        let soundEnabled = localStorage.getItem('slot_sound') !== 'false';
+
+        // ================================================================
+        //  МУЗЫКА
+        // ================================================================
+        const bgMusic = document.getElementById('bgMusic');
+        const musicToggleBtn = document.getElementById('musicToggleBtn');
+        const musicVolume = document.getElementById('musicVolume');
+        const volumeLabel = document.getElementById('volumeLabel');
+        const musicStatus = document.getElementById('musicStatus');
+        let musicEnabled = localStorage.getItem('slot_music_enabled') === 'true';
+        let musicVol = parseFloat(localStorage.getItem('slot_music_volume')) || 0.5;
+        if (bgMusic) {
+            bgMusic.volume = musicVol;
+            musicVolume.value = musicVol;
+            volumeLabel.textContent = Math.round(musicVol * 100) + '%';
+            if (musicEnabled) { bgMusic.play().catch(() => {});
+                musicToggleBtn.textContent = 'Выключить';
+                musicToggleBtn.classList.remove('off');
+                musicToggleBtn.style.background = 'rgba(231,76,60,0.15)';
+                musicToggleBtn.style.color = '#ff6b6b';
+                musicStatus.textContent = 'Включена';
+                musicStatus.style.color = '#50c878'; } else { musicToggleBtn.textContent = 'Включить';
+                musicToggleBtn.classList.add('off');
+                musicToggleBtn.style.background = 'rgba(255,255,255,0.04)';
+                musicToggleBtn.style.color = '#e0e0e0';
+                musicStatus.textContent = 'Выключена';
+                musicStatus.style.color = '#aabaca'; }
+        }
+        musicToggleBtn.addEventListener('click', function() {
+            musicEnabled = !musicEnabled;
+            localStorage.setItem('slot_music_enabled', musicEnabled);
+            if (bgMusic) {
+                if (musicEnabled) { bgMusic.play().catch(() => {});
+                    this.textContent = 'Выключить';
+                    this.classList.remove('off');
+                    this.style.background = 'rgba(231,76,60,0.15)';
+                    this.style.color = '#ff6b6b';
+                    musicStatus.textContent = 'Включена';
+                    musicStatus.style.color = '#50c878'; } else { bgMusic.pause();
+                    this.textContent = 'Включить';
+                    this.classList.add('off');
+                    this.style.background = 'rgba(255,255,255,0.04)';
+                    this.style.color = '#e0e0e0';
+                    musicStatus.textContent = 'Выключена';
+                    musicStatus.style.color = '#aabaca'; }
+            }
+        });
+        musicVolume.addEventListener('input', function() {
+            const val = parseFloat(this.value);
+            if (bgMusic) { bgMusic.volume = val;
+                localStorage.setItem('slot_music_volume', val);
+                volumeLabel.textContent = Math.round(val * 100) + '%'; }
+        });
+
+        // ================================================================
+        //  ЗВУКИ
+        // ================================================================
+        function playSpinSound() {
+            if (!soundEnabled) return;
+            try { const a = document.getElementById('spinSound'); if (a) { a.currentTime = 0;
+                    a.volume = 0.2;
+                    a.play().catch(() => {}); } } catch (e) {}
+        }
+
+        function playWinSound() {
+            if (!soundEnabled) return;
+            try { const a = document.getElementById('winSound'); if (a) { a.currentTime = 0;
+                    a.volume = 0.4;
+                    a.play().catch(() => {}); } } catch (e) {}
+        }
+
+        document.getElementById('soundToggleBtn').addEventListener('click', function() {
+            soundEnabled = !soundEnabled;
+            localStorage.setItem('slot_sound', soundEnabled);
+            this.innerHTML = soundEnabled ? '<i class="fas fa-volume-up"></i>' :
+            '<i class="fas fa-volume-mute"></i>';
+            document.getElementById('soundStatus').textContent = soundEnabled ? 'Включены' : 'Выключены';
+        });
+        if (!soundEnabled) {
+            document.getElementById('soundToggleBtn').innerHTML = '<i class="fas fa-volume-mute"></i>';
+            document.getElementById('soundStatus').textContent = 'Выключены';
+        }
+
+        // ================================================================
+        //  ДАННЫЕ
+        // ================================================================
+        function saveUserData(nick, data) {
+            database.ref('users/' + nick).set(data).catch(() => { try { localStorage.setItem('slot_' + nick, JSON.stringify(
+                        data)); } catch (e) {} });
+        }
+
+        function loadUserData(nick) {
+            return new Promise(resolve => {
+                database.ref('users/' + nick).once('value').then(snapshot => {
+                    const val = snapshot.val();
+                    if (val) resolve(val);
+                    else { try { const local = localStorage.getItem('slot_' + nick);
+                            resolve(local ? JSON.parse(local) : null); } catch (e) { resolve(null); } }
+                }).catch(() => { try { const local = localStorage.getItem('slot_' + nick);
+                        resolve(local ? JSON.parse(local) : null); } catch (e) { resolve(null); } });
+            });
+        }
+
+        // ================================================================
+        //  АВТОРИЗАЦИЯ
+        // ================================================================
+        const authScreen = document.getElementById('authScreen');
+        const appEl = document.getElementById('app');
+        const authError = document.getElementById('authError');
+        const authNick = document.getElementById('authNick');
+        const authPass = document.getElementById('authPass');
+        const authNextBtn = document.getElementById('authNextBtn');
+        const authLoginBtn = document.getElementById('authLoginBtn');
+        const authBackBtn = document.getElementById('authBackBtn');
+        const authStep1 = document.getElementById('authStep1');
+        const authStep2 = document.getElementById('authStep2');
+        let currentNick = '';
+
+        authNextBtn.addEventListener('click', () => {
+            const nick = authNick.value.trim();
+            if (nick.length < 3) { authError.textContent = 'Ник минимум 3 символа'; return; }
+            currentNick = nick;
+            authError.textContent = '';
+            authStep1.classList.add('hidden');
+            authStep2.classList.remove('hidden');
+            authPass.value = '';
+            authPass.focus();
+        });
+
+        authBackBtn.addEventListener('click', () => {
+            authStep2.classList.add('hidden');
+            authStep1.classList.remove('hidden');
+        });
+
+        authLoginBtn.addEventListener('click', async () => {
+            const pass = authPass.value.trim();
+            if (!pass) { authError.textContent = 'Введите пароль'; return; }
+            const data = await loadUserData(currentNick);
+            if (!data) {
+                const newData = { password: pass, coins: 1000, admin: false };
+                saveUserData(currentNick, newData);
+                currentUser = currentNick;
+                currentPassword = pass;
+                userData = newData;
+                isAdmin = false;
+                authError.textContent = '';
+                enterGame();
+                return;
+            }
+            if (data.password === pass) {
+                currentUser = currentNick;
+                currentPassword = pass;
+                userData = data;
+                isAdmin = data.admin || false;
+                authError.textContent = '';
+                enterGame();
+            } else { authError.textContent = 'Неверный пароль'; }
+        });
+
+        function enterGame() {
+            authScreen.style.display = 'none';
+            appEl.style.display = 'flex';
+            appEl.style.flexDirection = 'column';
+            document.getElementById('settingsNick').textContent = currentUser;
+            if (isAdmin) {
+                document.getElementById('adminPanel').style.display = 'block';
+                document.getElementById('settingsNick').innerHTML = currentUser + ' <span class="admin-tag">ADMIN</span>';
+            }
+            updateUI();
+            initGame();
+            showNotification('Добро пожаловать, ' + currentUser + '!');
+            renderLeaderboard();
+            updateOnlineCount();
+            // Автообновление лидерборда каждые 3 секунды
+            setInterval(() => {
+                if (document.getElementById('tabLeaderboard').classList.contains('active')) {
+                    renderLeaderboard();
+                }
+            }, 3000);
+        }
+
+        function showNotification(text) {
+            const notif = document.getElementById('notification');
+            document.getElementById('notifText').textContent = text;
+            notif.style.display = 'flex';
+            setTimeout(() => notif.style.display = 'none', 4000);
+        }
+        document.getElementById('notifClose').addEventListener('click', function() {
+            document.getElementById('notification').style.display = 'none';
+        });
+
+        // ================================================================
+        //  ИГРА
+        // ================================================================
+        const SYMBOLS = ['🍒', '🍋', '🍊', '🍇', '🔔', '7', '💎'];
+
+        function initGame() {
+            updateUI();
+            renderLeaderboard();
+            updateOnlineCount();
+
+            document.querySelectorAll('.bottom-nav .nav-item').forEach(item => {
+                item.addEventListener('click', function() {
+                    document.querySelectorAll('.bottom-nav .nav-item').forEach(n => n.classList.remove('active'));
+                    this.classList.add('active');
+                    const tabId = this.dataset.tab;
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.getElementById(tabId).classList.add('active');
+                    if (tabId === 'tabLeaderboard') renderLeaderboard();
+                });
+            });
+
+            document.querySelectorAll('.bet-chip').forEach(chip => {
+                chip.addEventListener('click', function() {
+                    if (isSpinning) return;
+                    const val = parseInt(this.dataset.value);
+                    const input = document.getElementById('bjBet');
+                    if (input) input.value = parseInt(input.value) + val;
+                });
+            });
+
+            document.getElementById('spinBtn').addEventListener('click', spin);
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+            document.getElementById('settingsBtn').addEventListener('click', function() {
+                document.querySelector('.bottom-nav .nav-item[data-tab="tabSettings"]').click();
+            });
+            document.getElementById('leaderboardBtn').addEventListener('click', function() {
+                document.querySelector('.bottom-nav .nav-item[data-tab="tabLeaderboard"]').click();
+            });
+            document.getElementById('codeApplyBtn').addEventListener('click', applyCode);
+            document.getElementById('adminAddCoins').addEventListener('click', adminAddCoins);
+            document.getElementById('adminSubCoins').addEventListener('click', adminSubCoins);
+            document.getElementById('adminDeleteAccount').addEventListener('click', adminDeleteAccount);
+        }
+
+        function updateUI() {
+            if (!userData) return;
+            document.getElementById('balanceCoins').textContent = userData.coins || 0;
+            if ((userData.coins || 0) <= 0) {
+                userData.coins = 100;
+                saveUserData(currentUser, userData);
+                updateUI();
+                showNotification('💸 Баланс пополнен на 100 монет');
+            }
+        }
+
+        function updateOnlineCount() {
+            database.ref('users').once('value').then(snapshot => {
+                const users = snapshot.val() || {};
+                let count = 0;
+                for (let nick in users) { if (users[nick].coins !== undefined) count++; }
+                document.getElementById('onlineCount').textContent = count;
+            });
+        }
+
+        function getBet() {
+            const input = document.getElementById('bjBet');
+            if (!input) return 10;
+            const val = parseInt(input.value);
+            return (isNaN(val) || val < 1) ? 10 : val;
+        }
+
+        function spin() {
+            if (isSpinning) return;
+            const bet = getBet();
+            if (bet > (userData.coins || 0)) {
+                showNotification('❌ Недостаточно монет!');
+                return;
+            }
+
+            isSpinning = true;
+            document.getElementById('spinBtn').disabled = true;
+            document.getElementById('spinBtn').textContent = '🌀 Крутится...';
+            document.getElementById('resultDisplay').textContent = '🌀 Крутим...';
+            document.getElementById('resultDisplay').className = 'result-display';
+
+            userData.coins = (userData.coins || 0) - bet;
+            updateUI();
+            saveUserData(currentUser, userData);
+
+            const reels = [document.getElementById('reel1'), document.getElementById('reel2'), document.getElementById('reel3')];
+            reels.forEach(r => r.classList.add('spinning'));
+            playSpinSound();
+
+            const results = [];
+            let spinCount = 0;
+            const totalSpins = 15 + Math.floor(Math.random() * 10);
+
+            const interval = setInterval(() => {
+                spinCount++;
+                reels.forEach((reel, i) => {
+                    const sym = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+                    reel.querySelector('.symbol').textContent = sym;
+                    results[i] = sym;
+                });
+                if (spinCount >= totalSpins) {
+                    clearInterval(interval);
+                    const finalResults = [];
+                    reels.forEach((reel, i) => {
+                        const sym = SYMBOLS[Math.floor(Math.random() * SYMBOLS.length)];
+                        reel.querySelector('.symbol').textContent = sym;
+                        finalResults[i] = sym;
+                        reel.classList.remove('spinning');
+                    });
+
+                    isSpinning = false;
+                    document.getElementById('spinBtn').disabled = false;
+                    document.getElementById('spinBtn').textContent = '🎰 Крутить';
+
+                    checkWin(finalResults, bet);
+                    saveUserData(currentUser, userData);
+                    renderLeaderboard();
+                    updateOnlineCount();
+                }
+            }, 80);
+        }
+
+        function checkWin(results, bet) {
+            const r1 = results[0],
+                r2 = results[1],
+                r3 = results[2];
+            let win = 0;
+            let msg = '';
+
+            if (r1 === r2 && r2 === r3) {
+                if (r1 === '7') { win = bet * 10;
+                    msg = '🎰 ДЖЕКПОТ! 3x7! +' + win; } else if (r1 === '💎') { win = bet * 5;
+                    msg = '💎 3xБриллиант! +' + win; } else if (r1 === '🔔') { win = bet * 3;
+                    msg = '🔔 3xКолокольчик! +' + win; } else if (r1 === '🍇') { win = bet * 2;
+                    msg = '🍇 3xВиноград! +' + win; } else { win = bet * 2;
+                    msg = '🍒🍋🍊 3xФрукты! +' + win; }
+            } else if ((r1 === '7' && r2 === '7') || (r1 === '7' && r3 === '7') || (r2 === '7' && r3 === '7')) {
+                win = bet * 2;
+                msg = '7️⃣ Две семёрки! +' + win;
+            } else if (r1 === r2 || r1 === r3 || r2 === r3) {
+                win = bet * 1;
+                msg = '🎯 Пара! +' + win;
+            } else {
+                msg = '❌ Проигрыш. -' + bet;
+                document.getElementById('resultDisplay').textContent = msg;
+                document.getElementById('resultDisplay').className = 'result-display';
+                updateUI();
+                return;
+            }
+
+            userData.coins = (userData.coins || 0) + win;
+            userData.totalWins = (userData.totalWins || 0) + 1;
+            if ((userData.coins || 0) > (userData.maxCoins || 0)) userData.maxCoins = userData.coins;
+            saveUserData(currentUser, userData);
+            updateUI();
+
+            document.getElementById('resultDisplay').textContent = msg;
+            document.getElementById('resultDisplay').className = 'result-display win-animation';
+            playWinSound();
+            showNotification('🎉 ' + msg);
+
+            const reels = [document.getElementById('reel1'), document.getElementById('reel2'), document.getElementById('reel3')];
+            reels.forEach(r => r.classList.add('win'));
+            setTimeout(() => reels.forEach(r => r.classList.remove('win')), 1500);
+
+            renderLeaderboard();
+        }
+
+        // ================================================================
+        //  ЛИДЕРБОРД (ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ)
+        // ================================================================
+        function renderLeaderboard() {
+            const container = document.getElementById('leaderboardList');
+            database.ref('users').once('value').then(snapshot => {
+                const users = snapshot.val() || {};
+                let list = [];
+                for (let nick in users) {
+                    if (users[nick].coins !== undefined) {
+                        list.push({ nickname: nick, score: users[nick].coins || 0 });
+                    }
+                }
+                list.sort((a, b) => b.score - a.score);
+                const top = list.slice(0, 50);
+
+                let html = '';
+                if (top.length === 0) {
+                    html = '<p style="text-align:center;color:#7a8a9e;font-size:13px;">Пока никого нет. Зарегистрируйтесь и играйте!</p>';
+                } else {
+                    top.forEach((entry, idx) => {
+                        let rankClass = '';
+                        if (idx === 0) rankClass = 'gold';
+                        else if (idx === 1) rankClass = 'silver';
+                        else if (idx === 2) rankClass = 'bronze';
+                        const isMe = entry.nickname === currentUser;
+                        html += `<div class="leader-item" style="${isMe ? 'border-left-color:#4fc3f7;' : ''}">
+                            <span class="rank ${rankClass}">#${idx+1}</span>
+                            <span class="name">${entry.nickname} ${isMe ? '⭐' : ''}</span>
+                            <span class="score">${entry.score}</span>
+                        </div>`;
+                    });
+                }
+                container.innerHTML = html;
+            }).catch(err => {
+                container.innerHTML = '<p style="text-align:center;color:#ff6b6b;font-size:13px;">Ошибка загрузки: ' + err
+                    .message + '</p>';
+            });
+        }
+
+        // ================================================================
+        //  АДМИНКА
+        // ================================================================
+        async function adminAddCoins() {
+            if (!isAdmin) return;
+            const nick = document.getElementById('adminNick').value.trim();
+            if (!nick) { alert('Введите ник игрока'); return; }
+            const val = parseInt(document.getElementById('adminCoins').value);
+            if (isNaN(val) || val <= 0) return;
+
+            const data = await loadUserData(nick);
+            if (!data) {
+                alert('❌ Игрок ' + nick + ' не найден! Проверьте ник (регистр важен)');
+                return;
+            }
+            data.coins = (data.coins || 0) + val;
+            saveUserData(nick, data);
+            alert('✅ Добавлено ' + val + ' монет игроку ' + nick);
+            if (nick === currentUser) { userData = data;
+                updateUI(); }
+            renderLeaderboard();
+        }
+
+        async function adminSubCoins() {
+            if (!isAdmin) return;
+            const nick = document.getElementById('adminNick').value.trim();
+            if (!nick) { alert('Введите ник игрока'); return; }
+            const val = parseInt(document.getElementById('adminCoins').value);
+            if (isNaN(val) || val <= 0) return;
+
+            const data = await loadUserData(nick);
+            if (!data) {
+                alert('❌ Игрок ' + nick + ' не найден! Проверьте ник (регистр важен)');
+                return;
+            }
+            data.coins = Math.max(0, (data.coins || 0) - val);
+            saveUserData(nick, data);
+            alert('✅ Убавлено ' + val + ' монет у игрока ' + nick);
+            if (nick === currentUser) { userData = data;
+                updateUI(); }
+            renderLeaderboard();
+        }
+
+        async function adminDeleteAccount() {
+            if (!isAdmin) return;
+            const nick = document.getElementById('adminNick').value.trim();
+            if (!nick) { alert('Введите ник игрока'); return; }
+            if (!confirm('Удалить аккаунт ' + nick + '?')) return;
+
+            const data = await loadUserData(nick);
+            if (!data) {
+                alert('❌ Игрок ' + nick + ' не найден!');
+                return;
+            }
+            database.ref('users/' + nick).remove().then(() => {
+                alert('✅ Аккаунт ' + nick + ' удалён');
+                if (nick === currentUser) logout();
+                renderLeaderboard();
+            });
+        }
+
+        // ================================================================
+        //  КОДЫ
+        // ================================================================
+        async function applyCode() {
+            const code = document.getElementById('codeInput').value.trim();
+            const msg = document.getElementById('codeMessage');
+            if (!code) { msg.textContent = 'Введите код'; return; }
+            if (code === '000000') {
+                if (!isAdmin) {
+                    const data = await loadUserData(currentUser);
+                    if (data) {
+                        data.admin = true;
+                        saveUserData(currentUser, data);
+                        isAdmin = true;
+                        userData = data;
+                        msg.textContent = '✅ Вы администратор!';
+                        document.getElementById('adminPanel').style.display = 'block';
+                        document.getElementById('settingsNick').innerHTML = currentUser + ' <span class="admin-tag">ADMIN</span>';
+                        showNotification('👑 Вы администратор!');
+                    }
+                } else msg.textContent = '❌ Вы уже администратор!';
+                return;
+            }
+            if (code === '777') {
+                userData.coins = (userData.coins || 0) + 100;
+                saveUserData(currentUser, userData);
+                updateUI();
+                msg.textContent = '✅ +100 монет!';
+                showNotification('🎁 +100 монет!');
+                return;
+            }
+            msg.textContent = '❌ Неверный код';
+        }
+
+        // ================================================================
+        //  ВЫХОД
+        // ================================================================
+        function logout() {
+            if (confirm('Выйти?')) {
+                currentUser = null;
+                userData = null;
+                isAdmin = false;
+                appEl.style.display = 'none';
+                authScreen.style.display = 'flex';
+                authStep1.classList.remove('hidden');
+                authStep2.classList.add('hidden');
+                authNick.value = '';
+                authPass.value = '';
+                authError.textContent = '';
+                document.getElementById('notification').style.display = 'none';
+                if (bgMusic) bgMusic.pause();
+            }
+        }
+
+        authScreen.style.display = 'flex';
+        appEl.style.display = 'none';
+        console.log('🎰 Слоты загружены!');
+        console.log('🔥 Лидерборд обновляется каждые 3 секунды');
+    </script>
+</body>
+</html>

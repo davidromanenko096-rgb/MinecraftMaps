@@ -25,18 +25,22 @@ body {
   100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
 }
 
-/* Плеер */
-.music-player {
-  position: fixed; top: 15px; right: 15px; z-index: 100;
-  background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(10px);
-  padding: 10px 15px; border-radius: 30px;
-  box-shadow: 0 5px 15px rgba(201, 24, 74, 0.2);
-  display: flex; align-items: center; gap: 10px;
-  border: 2px solid rgba(255, 182, 193, 0.6);
-  cursor: pointer; transition: transform 0.2s;
+/* Маленькая кнопка музыки в углу */
+.music-btn {
+  position: fixed; bottom: 20px; right: 20px; z-index: 100;
+  width: 50px; height: 50px; border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(10px);
+  border: 2px solid #ffb6c1;
+  box-shadow: 0 5px 15px rgba(201, 24, 74, 0.3);
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.3rem;
+  transition: all 0.3s;
 }
-.music-player:hover { transform: scale(1.05); }
-.music-player span { font-size: 0.9rem; color: #c9184a; font-weight: bold; }
+.music-btn:hover { transform: scale(1.1); background: white; }
+.music-btn.playing { animation: spin 4s linear infinite; border-color: #c9184a; }
+@keyframes spin { 100% { transform: rotate(360deg); } }
 
 /* Обложка */
 .hero {
@@ -82,7 +86,7 @@ body {
 .photo:nth-child(even) { transform: rotate(2deg); }
 .photo:hover { transform: rotate(0deg) scale(1.05); z-index: 2; }
 .photo img { width: 100%; height: 350px; object-fit: cover; border-radius: 8px; display: block; }
-/* Легкое размытие для второй фотки, чтобы лицо было нечетким */
+/* Легкое размытие для второй фотки */
 .photo.blur-face img { filter: blur(2px); transition: filter 0.3s; }
 .photo.blur-face:hover img { filter: blur(0px); }
 .photo .caption { text-align: center; padding: 0.8rem 0.3rem 0.3rem; font-style: italic; color: #800f2f; font-size: 1rem; font-weight: bold; }
@@ -126,10 +130,12 @@ footer { text-align: center; padding: 3rem 2rem; color: #800f2f; font-style: ita
 
 <!-- Музыка -->
 <audio id="bg-music" loop>
-  <source src="song.mp3" type="audio/mpeg">
+  <source src="music.mp3" type="audio/mpeg">
 </audio>
-<div class="music-player" onclick="toggleMusic()">
-  <span id="music-icon">▶️ Включить музыку</span>
+
+<!-- Маленькая кнопка в углу -->
+<div class="music-btn" id="music-btn" onclick="toggleMusic(event)">
+  🎵
 </div>
 
 <div class="hearts" id="hearts"></div>
@@ -235,29 +241,38 @@ function createHeart() {
 }
 setInterval(createHeart, 600);
 
-// Плеер
+// Музыка
 const music = document.getElementById('bg-music');
-const musicIcon = document.getElementById('music-icon');
+const musicBtn = document.getElementById('music-btn');
 let isPlaying = false;
 
-function toggleMusic() {
+function toggleMusic(event) {
+  // Останавливаем клик, чтобы он не срабатывал дважды
+  if (event) event.stopPropagation();
+  
   if (isPlaying) {
     music.pause();
-    musicIcon.textContent = '▶️ Включить музыку';
+    musicBtn.classList.remove('playing');
+    musicBtn.innerHTML = '🎵';
   } else {
     music.play();
-    musicIcon.textContent = '⏸️ Пауза';
+    musicBtn.classList.add('playing');
+    musicBtn.innerHTML = '🎶';
   }
   isPlaying = !isPlaying;
 }
 
-// Автозапуск при первом клике (браузеры блокируют автоплей)
-document.body.addEventListener('click', function playOnFirstClick() {
+// Автозапуск при ПЕРВОМ клике в любом месте экрана
+document.body.addEventListener('click', function playOnFirstClick(e) {
+  // Если кликнули на кнопку музыки — не запускаем дважды
+  if (e.target.closest('.music-btn')) return; 
+  
   if (!isPlaying) {
     music.play().then(() => {
       isPlaying = true;
-      musicIcon.textContent = '⏸️ Пауза';
-    }).catch(e => console.log('Нужен файл song.mp3'));
+      musicBtn.classList.add('playing');
+      musicBtn.innerHTML = '🎶';
+    }).catch(err => console.log('Нужен файл music.mp3'));
   }
   document.body.removeEventListener('click', playOnFirstClick);
 }, { once: true });
